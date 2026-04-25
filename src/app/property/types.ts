@@ -14,6 +14,14 @@ export interface Property {
   industry: string;
   contact: string;
   remark: string;
+  lat?: number | null;
+  lng?: number | null;
+  powerKV?: number | null;
+  landNature?: string;
+  is104Block?: string;
+  parkingTotal?: string;
+  canteen?: string;
+  dormitory?: string;
 }
 
 export interface Industry {
