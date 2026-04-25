@@ -55,6 +55,8 @@ export default function PolicyPage() {
     let cancelled = false;
     async function loadOptions() {
       try {
+        // Bust stale cache
+        try { localStorage.removeItem('pm_cache_policies'); } catch {}
         const policies = await loadPolicies();
         if (cancelled) return;
         await new Promise(r => setTimeout(r, 0));
@@ -124,6 +126,8 @@ export default function PolicyPage() {
       try {
         console.log('[PolicyPage] loadPreview: calling loadPolicies...');
         setDebugInfo('loadPreview: loading policies...');
+        // Bust empty stale cache so we always get fresh data
+        try { localStorage.removeItem('pm_cache_policies'); } catch {}
         const allPolicies = await loadPolicies();
         console.log('[PolicyPage] loadPreview: got', allPolicies.length, 'policies');
         setDebugInfo('loadPreview: got ' + allPolicies.length + ' policies, matching...');
@@ -283,8 +287,9 @@ export default function PolicyPage() {
 
       {/* ── 主内容区 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "270px 1fr", gap: "14px" }}>
-        {resultCount > 0 && <div style={{background:"#bbf7d0",padding:"6px 12px",fontSize:"12px",color:"#166534",marginBottom:"8px",borderRadius:"6px"}}>✅ results.length = {resultCount}</div>}
-        {debugInfo && <div style={{background:'#fef9c3',padding:'6px 12px',fontSize:'11px',color:'#92400e',marginBottom:'8px',borderRadius:'6px'}}>🔧 {debugInfo}</div>}
+        <div style={{gridColumn:"1/-1",background:"#dbeafe",padding:"6px 12px",fontSize:"12px",color:"#1e40af",marginBottom:"8px",borderRadius:"6px"}}>
+          🔍 results.length=<strong>{results.length}</strong> | total=<strong>{total}</strong> | showing=<strong>{showing}</strong> | resultCount=<strong>{resultCount}</strong>
+        </div>
         <aside className="sidebar" style={{ maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
           {loadError && (
             <div className="load-error">
