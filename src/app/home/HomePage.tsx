@@ -68,12 +68,12 @@ export default function HomePage() {
 
       {/* 模块卡片区 */}
       <div className="module-grid">
-        <div className="module-card module-active" onClick={() => (window as any).__setPage?.("policy")}>
+        <div className="module-card module-active" onClick={() => (window as any).__setPage__?.("policy")}>
           <div className="module-icon">📋</div>
           <div className="module-info">
             <div className="module-name">政策智能匹配</div>
             <div className="module-version">v1.0 已上线</div>
-            <div className="module-desc">基于 Mock 数据的多维政策检索，关键词搜索、区域/行业/部门筛选，支持政策详情展开查看和 PDF 导出。</div>
+            <div className="module-desc">基于飞书数据的多维政策检索，关键词搜索、区域/行业/部门筛选，支持政策详情展开查看和 PDF 导出。</div>
           </div>
           <div className="module-tags">
             <span className="module-tag">关键词检索</span>
@@ -83,7 +83,7 @@ export default function HomePage() {
           <div className="module-enter">进入 →</div>
         </div>
 
-        <div className="module-card module-active" onClick={() => (window as any).__setPage?.("property")}>
+        <div className="module-card module-active" onClick={() => (window as any).__setPage__?.("property")}>
           <div className="module-icon">🏢</div>
           <div className="module-info">
             <div className="module-name">物业载体匹配</div>
@@ -98,7 +98,7 @@ export default function HomePage() {
           <div className="module-enter">进入 →</div>
         </div>
 
-        <div className="module-card module-placeholder" onClick={() => (window as any).__setPage?.("placeholder-invest")}>
+        <div className="module-card module-placeholder" onClick={() => (window as any).__setPage__?.("placeholder-invest")}>
           <div className="module-icon">📊</div>
           <div className="module-info">
             <div className="module-name">招商管理</div>
@@ -113,7 +113,7 @@ export default function HomePage() {
           <div className="module-enter placeholder">敬请期待</div>
         </div>
 
-        <div className="module-card module-placeholder" onClick={() => (window as any).__setPage?.("placeholder-industry")}>
+        <div className="module-card module-placeholder" onClick={() => (window as any).__setPage__?.("placeholder-industry")}>
           <div className="module-icon">🗺️</div>
           <div className="module-info">
             <div className="module-name">产业图谱</div>
