@@ -16,6 +16,13 @@
     "fs:default",
     "fs:allow-write-text-file",
     "shell:allow-open",
-    "http:default"
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "https://open.feishu.cn/**" },
+        { "url": "https://pyd.pudong.gov.cn/**" }
+      ]
+    }
   ]
 }

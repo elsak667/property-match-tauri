@@ -3,7 +3,7 @@
  * 从 Python Flask app (v1.2) 移植
  */
 
-import { invoke } from "@tauri-apps/api/core";
+// Try Tauri HTTP plugin first, fall back to native fetch
 
 // ── 标签映射 ─────────────────────────────────────────────────────────────────
 
@@ -276,8 +276,10 @@ export async function loadPolicies(): Promise<Policy[]> {
   return cacheOrRefresh<Policy[]>("policies", async () => {
     const rows = await getPolicySheetRows();
     if (!rows || rows.length < 2) return [];
+      console.warn("[loadPolicies] No rows, length:", rows?.length);
 
     const headers = (rows[0] as unknown[]).map((h: unknown) => String(h || "").trim());
+    console.log("[loadPolicies] headers:", headers.slice(0,8), "| rows:", rows.length);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -345,6 +347,7 @@ export async function loadPolicies(): Promise<Policy[]> {
     });
   }
 
+  console.log("[loadPolicies] parsed", policies.length, "policies");
   return policies;
   });
 }
@@ -581,38 +584,32 @@ export function getStars(rank: number): string {
 }
 
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
-// feishu.ts logic is inlined here to avoid Node.js dependencies.
-// Uses Tauri HTTP plugin or direct browser fetch.
+// Uses Tauri invoke to call Rust backend Feishu proxy commands.
 
 const FEISHU_APP_ID = (typeof import.meta !== 'undefined' && (import.meta as {env?: Record<string, string>}).env?.VITE_FEISHU_APP_ID) || "";
 const FEISHU_APP_SECRET = (typeof import.meta !== 'undefined' && (import.meta as {env?: Record<string, string>}).env?.VITE_FEISHU_APP_SECRET) || "";
 
-// 浦东政策 spreadsheet
 const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-const POLICY_SHEET_ID = "0aad30"; // Sheet1
+const POLICY_SHEET_ID = "0aad30";
 
-interface TenantToken {
-  token: string;
-  expiresAt: number;
-}
-
+interface TenantToken { token: string; expiresAt: number; }
 let cachedToken: TenantToken | null = null;
 
 async function getTenantToken(): Promise<string> {
   if (!FEISHU_APP_ID || !FEISHU_APP_SECRET) {
-    throw new Error("飞书凭证未配置，请设置 VITE_FEISHU_APP_ID 和 VITE_FEISHU_APP_SECRET 环境变量");
+    throw new Error("飞书凭证未配置，请设置 VITE_FEISHU_APP_ID 和 VITE_FEISHU_APP_SECRET");
   }
-
   const now = Date.now();
   if (cachedToken && now < cachedToken.expiresAt - 300000) {
     return cachedToken.token;
   }
-
+  const { invoke } = await import("@tauri-apps/api/core");
+  console.log("[feishu_token] invoke:", typeof invoke, "window.__TAURI_INTERNALS__:", typeof (window as any).__TAURI_INTERNALS__);
   const token: string = await invoke("feishu_token", {
     appId: FEISHU_APP_ID,
     appSecret: FEISHU_APP_SECRET,
   });
-
+  console.log("[feishu_token] success, token length:", token.length);
   cachedToken = { token, expiresAt: now + 3600 * 1000 };
   return token;
 }
@@ -620,18 +617,14 @@ async function getTenantToken(): Promise<string> {
 async function getSheetData(sheetToken: string, sheetId: string, range?: string): Promise<unknown[][]> {
   const queryRange = range || "A1:AA1000";
   const token = await getTenantToken();
-
+  const { invoke } = await import("@tauri-apps/api/core");
   const result: any = await invoke("feishu_sheet", {
     token,
     spreadsheet: sheetToken,
     sheetId,
     range: queryRange,
   });
-
-  if (result?.code !== 0) {
-    throw new Error(`Feishu API error: ${result?.msg}`);
-  }
-
+  if (result?.code !== 0) throw new Error(`Feishu API error: ${result?.msg}`);
   return result?.data?.valueRange?.values || [];
 }
 
@@ -808,8 +801,9 @@ export function setCache<T>(key: string, data: T): void {
 async function cacheOrRefresh<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   const cached = getCached<T>(key);
   if (cached) {
+    console.log('[cacheOrRefresh] Using cached data for', key);
     // Kick off background refresh (fire-and-forget)
-    fetcher().then(data => setCache(key, data)).catch(() => {});
+    fetcher().then(data => { console.log('[cacheOrRefresh] Background refresh OK for', key); setCache(key, data); }).catch(e => { console.warn('[cacheOrRefresh] Background refresh failed for', key, e); });
     return cached;
   }
   const data = await fetcher();
