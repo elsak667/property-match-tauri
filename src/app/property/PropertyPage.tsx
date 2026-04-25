@@ -2,12 +2,18 @@
  * 物业载体匹配页面
  */
 import { useState, useEffect, useCallback } from "react";
-import { PROPERTIES, INDUSTRY_PROFILES, filterProperties } from "./mockData";
+import { INDUSTRY_PROFILES, filterProperties } from "./mockData";
+import { useProperties } from "../../lib/useFeishu";
 import type { Property, IndustryCategory } from "./types";
+import PropertyMap from "../../components/PropertyMap";
 
-function PropertyCard({ item }: { item: Property }) {
+function PropertyCard({ item, active, onClick }: { item: Property; active: boolean; onClick: () => void }) {
   return (
-    <div className="result-item">
+    <div
+      className={`result-item${active ? " expanded" : ""}`}
+      style={{ cursor: "pointer", borderLeft: active ? "3px solid #3b6db5" : undefined }}
+      onClick={onClick}
+    >
       <div className="result-top">
         <div className="result-name">{item.name}</div>
         <span className="hot-badge">🏢 {item.type}</span>
@@ -29,13 +35,33 @@ function PropertyCard({ item }: { item: Property }) {
       {item.remark && (
         <div className="result-details">
           <div className="detail-section">
-            <div className="detail-title">备注</div>
-            <div className="detail-text">{item.remark}</div>
+            <div className="detail-title">基本信息</div>
+            <div className="detail-grid">
+              <div className="detail-item"><span className="detail-label">配电</span><span className="detail-value">{item.powerKV ? `${item.powerKV}KVA` : "—"}</span></div>
+              <div className="detail-item"><span className="detail-label">土地性质</span><span className="detail-value">{item.landNature || "—"}</span></div>
+              <div className="detail-item"><span className="detail-label">104地块</span><span className="detail-value">{item.is104Block || "—"}</span></div>
+              <div className="detail-item"><span className="detail-label">停车位</span><span className="detail-value">{item.parkingTotal || "—"}</span></div>
+            </div>
           </div>
+          {item.remark && (
+            <div className="detail-section">
+              <div className="detail-title">备注</div>
+              <div className="detail-text">{item.remark}</div>
+            </div>
+          )}
           {item.contact && (
             <div className="detail-section">
               <div className="detail-title">联系方式</div>
               <div className="detail-text">{item.contact}</div>
+            </div>
+          )}
+          {(item.canteen || item.dormitory) && (
+            <div className="detail-section">
+              <div className="detail-title">🏪 园区配套</div>
+              <div className="detail-grid">
+                {item.canteen && <div className="detail-item"><span className="detail-label">食堂</span><span className="detail-value">{item.canteen}</span></div>}
+                {item.dormitory && <div className="detail-item"><span className="detail-label">宿舍</span><span className="detail-value">{item.dormitory}</span></div>}
+              </div>
             </div>
           )}
         </div>
@@ -45,6 +71,7 @@ function PropertyCard({ item }: { item: Property }) {
 }
 
 export default function PropertyPage() {
+  const { properties, loading, fromFeishu } = useProperties();
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [areaMin, setAreaMin] = useState("");
@@ -52,18 +79,27 @@ export default function PropertyPage() {
   const [priceMax, setPriceMax] = useState("");
   const [loadMin, setLoadMin] = useState("");
   const [heightMin, setHeightMin] = useState("");
+  const [powerKVMin, setPowerKVMin] = useState("");
+  const [selectedPark, setSelectedPark] = useState("");
+  const [is104, setIs104] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedIndustry, setSelectedIndustry] = useState("");
   const [activeProfile, setActiveProfile] = useState<IndustryCategory["industries"][0] | null>(null);
-  const [results, setResults] = useState<Property[]>(PROPERTIES);
+  const [results, setResults] = useState<Property[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showMap, setShowMap] = useState(true);
 
-  const types = [...new Set(PROPERTIES.map(p => p.type).filter(Boolean))].sort();
+  // 同步 properties → results
+  useEffect(() => {
+    setResults(properties);
+  }, [properties]);
 
+  const types = [...new Set(properties.map(p => p.type).filter(Boolean))].sort();
   const currentCategory = INDUSTRY_PROFILES.categories.find(c => c.code === selectedCategory);
   const currentIndustries = currentCategory?.industries || [];
 
   const doSearch = useCallback(() => {
-    const filtered = filterProperties(PROPERTIES, {
+    const filtered = filterProperties(properties, {
       query: query || undefined,
       type: selectedType || undefined,
       areaMin: areaMin ? parseFloat(areaMin) : undefined,
@@ -71,14 +107,23 @@ export default function PropertyPage() {
       priceMax: priceMax ? parseFloat(priceMax) : undefined,
       loadMin: loadMin ? parseFloat(loadMin) : undefined,
       heightMin: heightMin ? parseFloat(heightMin) : undefined,
+      powerKVMin: powerKVMin ? parseFloat(powerKVMin) : undefined,
+      park: selectedPark || undefined,
+      is104: is104 || undefined,
     });
     setResults(filtered);
-  }, [query, selectedType, areaMin, areaMax, priceMax, loadMin, heightMin]);
+  }, [properties, query, selectedType, areaMin, areaMax, priceMax, loadMin, heightMin, powerKVMin, selectedPark, is104]);
 
   useEffect(() => {
     const t = setTimeout(doSearch, 300);
     return () => clearTimeout(t);
   }, [doSearch]);
+
+  useEffect(() => {
+    if (!results.find(r => r.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [results, selectedId]);
 
   function applyProfile(profile: IndustryCategory["industries"][0]) {
     setActiveProfile(profile);
@@ -90,16 +135,19 @@ export default function PropertyPage() {
   function resetAll() {
     setQuery(""); setSelectedType(""); setAreaMin(""); setAreaMax("");
     setPriceMax(""); setLoadMin(""); setHeightMin("");
+    setPowerKVMin(""); setSelectedPark(""); setIs104("");
     setSelectedCategory(""); setSelectedIndustry(""); setActiveProfile(null);
+    setSelectedId(null);
   }
 
-  const activeFiltersCount = [selectedType, areaMin, areaMax, priceMax, loadMin, heightMin, query].filter(Boolean).length;
+  const activeFiltersCount = [selectedType, areaMin, areaMax, priceMax, loadMin, heightMin, powerKVMin, selectedPark, is104, query].filter(Boolean).length;
+
+  const parks = [...new Set(properties.map(p => p.park).filter(Boolean))].sort();
 
   return (
     <div className="container">
       <div className="main-layout">
         <aside className="sidebar">
-          {/* 产业推荐 */}
           <div className="filter-section">
             <div className="filter-label">🏭 产业推荐</div>
             <select
@@ -148,7 +196,6 @@ export default function PropertyPage() {
 
           <div className="divider" />
 
-          {/* 基础筛选 */}
           <div className="filter-section">
             <div className="filter-label">🔍 关键词搜索</div>
             <input
@@ -198,6 +245,38 @@ export default function PropertyPage() {
             <input type="number" step="0.1" placeholder="如 4.5" value={heightMin} onChange={e => setHeightMin(e.target.value)} />
           </div>
 
+          <div className="filter-section">
+            <div className="filter-label">⚡ 最低配电容量（KVA）</div>
+            <input type="number" placeholder="如 315" value={powerKVMin} onChange={e => setPowerKVMin(e.target.value)} />
+          </div>
+
+          {parks.length > 0 && (
+            <div className="filter-section">
+              <div className="filter-label">🏗️ 园区</div>
+              <select
+                className="filter-select"
+                value={selectedPark}
+                onChange={e => setSelectedPark(e.target.value)}
+              >
+                <option value="">— 全部园区 —</option>
+                {parks.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="filter-section">
+            <div className="filter-label">📍 104地块</div>
+            <select
+              className="filter-select"
+              value={is104}
+              onChange={e => setIs104(e.target.value)}
+            >
+              <option value="">— 全部 —</option>
+              <option value="是">是</option>
+              <option value="否">否</option>
+            </select>
+          </div>
+
           <div className="form-actions">
             <button className="btn-secondary" onClick={resetAll}>重置</button>
             <button className="btn-primary" onClick={doSearch}>🔍 搜索</button>
@@ -209,21 +288,58 @@ export default function PropertyPage() {
 
         <main className="content">
           <div className="toolbar">
-            <div className="count">共找到 <strong>{results.length}</strong> 处物业</div>
+            <div className="count">
+              {loading ? (
+                <>加载中...</>
+              ) : (
+                <>共找到 <strong>{results.length}</strong> 处物业</>
+              )}
+            </div>
             <div className="legend">
-              <span className="legend-item">数据来源：飞书表格</span>
+              <span className="legend-item">
+                {fromFeishu ? "📡 飞书数据" : "📋 Mock数据"}
+              </span>
             </div>
           </div>
 
-          <div className="result-list">
-            {results.length === 0 ? (
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <button
+              className={`btn-${showMap ? "secondary" : "primary"}`}
+              onClick={() => setShowMap(v => !v)}
+            >
+              {showMap ? "📍 收起地图" : "🗺️ 显示地图"}
+            </button>
+          </div>
+
+          {showMap && (
+            <PropertyMap
+              buildings={results}
+              selectedId={selectedId}
+              onSelect={id => setSelectedId(prev => prev === id ? null : id)}
+            />
+          )}
+
+          <div className="result-list" style={{ marginTop: 14 }}>
+            {loading ? (
+              <div className="loading-state">
+                <div className="spinner" aria-label="加载中"></div>
+                <p>正在加载物业数据...</p>
+              </div>
+            ) : results.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">🏢</div>
                 <p>未找到匹配物业</p>
                 <small>试试调整筛选条件</small>
               </div>
             ) : (
-              results.map(item => <PropertyCard key={item.id} item={item} />)
+              results.map(item => (
+                <PropertyCard
+                  key={item.id}
+                  item={item}
+                  active={selectedId === item.id}
+                  onClick={() => setSelectedId(prev => prev === item.id ? null : item.id)}
+                />
+              ))
             )}
           </div>
         </main>
