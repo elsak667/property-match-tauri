@@ -36,6 +36,8 @@ export default function PolicyPage() {
   const [showExport, setShowExport] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("正在加载...");
+  const [resultCount, setResultCount] = useState<number>(0);
   const [stats, setStats] = useState<{local数据库:number; 官方总数:number; 匹配率:string; 差异:number; 数据来源:string; 官方链接:string} | null>(null);
 
   useEffect(() => {
@@ -120,8 +122,14 @@ export default function PolicyPage() {
     async function loadPreview() {
       previewPending.current = true;
       try {
+        console.log('[PolicyPage] loadPreview: calling loadPolicies...');
+        setDebugInfo('loadPreview: loading policies...');
         const allPolicies = await loadPolicies();
+        console.log('[PolicyPage] loadPreview: got', allPolicies.length, 'policies');
+        setDebugInfo('loadPreview: got ' + allPolicies.length + ' policies, matching...');
+        setResultCount(0); // will update when setResults is called
         const previewResults = matchPolicies(allPolicies, {}, 5, true);
+        console.log('[PolicyPage] loadPreview: got', previewResults.length, 'results');
         const out: PolicyResult[] = previewResults.map(p => ({
           _group: false,
           name: p.name, amount: p.amount, amount_s: p.amount_s,
@@ -135,7 +143,9 @@ export default function PolicyPage() {
           _reasons: p._reasons,
           stars: p._rank <= 3 ? "★★★" : p._rank <= 8 ? "★★☆" : "★☆☆",
         }));
+        console.log("[PolicyPage] loadPreview setResults:", out.length, "policies");
         setResults(out);
+        setResultCount(out.length);
         setTotal(allPolicies.length);
         setShowing(out.length);
       } catch (e) {  }
@@ -273,6 +283,8 @@ export default function PolicyPage() {
 
       {/* ── 主内容区 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "270px 1fr", gap: "14px" }}>
+        {resultCount > 0 && <div style={{background:"#bbf7d0",padding:"6px 12px",fontSize:"12px",color:"#166534",marginBottom:"8px",borderRadius:"6px"}}>✅ results.length = {resultCount}</div>}
+        {debugInfo && <div style={{background:'#fef9c3',padding:'6px 12px',fontSize:'11px',color:'#92400e',marginBottom:'8px',borderRadius:'6px'}}>🔧 {debugInfo}</div>}
         <aside className="sidebar" style={{ maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
           {loadError && (
             <div className="load-error">
