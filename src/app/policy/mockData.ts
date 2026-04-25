@@ -146,13 +146,11 @@ export function filterPolicies(
     industry?: string;
     location?: string;
     dept?: string;
-    subjects?: string[];
     caps?: string[];
-    thresholds?: string[];
     cats?: string[];
   },
 ): PolicyResult[] {
-  const { query, industry, location, dept, subjects = [], caps = [], thresholds = [], cats = [] } = opts;
+  const { query, industry, location, dept, caps = [], cats = [] } = opts;
   return policies.filter(p => {
     const q = (query || "").toLowerCase();
     const matchQuery = !q || !p.name || p.name.toLowerCase().includes(q) ||
@@ -160,10 +158,8 @@ export function filterPolicies(
     const matchIndustry = !industry || !p.industry || p.industry.includes(industry) || industry === "全部行业" || industry === "all";
     const matchLocation = !location || !p.area || p.area.includes(location);
     const matchDept = !dept || p.dept?.includes(dept);
-    const matchSubject = subjects.length === 0 || subjects.some(s => p.subject?.includes(s));
-    const matchCap = caps.length === 0 || caps.some(c => p.cap?.includes(c));
-    const matchThreshold = thresholds.length === 0 || thresholds.some(t => p.threshold?.includes(t));
+    const matchCap = caps.length === 0 || caps.some(c => p.cap?.includes(c) || c === p.cap);
     const matchCat = cats.length === 0 || cats.some(c => p.cat === c);
-    return matchQuery && matchIndustry && matchLocation && matchDept && matchSubject && matchCap && matchThreshold && matchCat;
+    return matchQuery && matchIndustry && matchLocation && matchDept && matchCap && matchCat;
   });
 }

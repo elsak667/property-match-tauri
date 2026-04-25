@@ -267,8 +267,8 @@ const handleSearch = async () => {
                           const b = allBuildings.find(b => b.building_id === r.property.building_id);
                           return { ...b, building_id: r.property.building_id, name: b?.name || r.property.building_name || b?.building_id, floors: b?.floors ?? null, area_vacant: r.property.area_vacant ?? 0, park_id: r.property.park_id };
                         })
-                      : allBuildings.map(b => ({ ...b, name: b.name || b.building_id }))}
-                    parks={allParks}
+                      : allBuildings.map(b => ({ ...b, name: b.name || b.building_id })) as any}
+                    parks={allParks as any}
                   />
                 </div>
               )}

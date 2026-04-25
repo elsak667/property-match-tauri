@@ -1,55 +1,56 @@
+/**
+ * Tauri / Rust 后端 API 调用层
+ */
 import { invoke } from "@tauri-apps/api/core";
 
-/**
- * 打开打印窗口（浏览器原生打印对话框，用户自行另存为 PDF）
- */
-export async function openPrintWindow(html: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    await invoke("open_print_window", { html });
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: String(err) };
-  }
+export interface FeishuConfig {
+  has_app_id: string;
+  has_credentials: string;
+  property_sheet: string;
+  policy_sheet: string;
 }
 
-/**
- * 获取政策统计信息
- */
-export async function getPolicyStats(): Promise<{
-  local数据库: number;
-  官方总数: number;
-  匹配率: string;
-  差异: number;
-  数据来源: string;
-  官方链接: string;
+export interface SheetData {
+  headers: string[];
+  data: Record<string, unknown>[];
+}
+
+// ── 飞书配置 ─────────────────────────────────────────────────────────────────
+export async function getFeishuConfig(): Promise<FeishuConfig> {
+  return invoke<FeishuConfig>("feishu_config");
+}
+
+export async function feishuDebug(): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>("feishu_debug");
+}
+
+// ── 物业载体数据 ──────────────────────────────────────────────────────────────
+export async function fetchPropertiesFromFeishu(): Promise<SheetData> {
+  return invoke<SheetData>("feishu_fetch_properties");
+}
+
+// ── 政策数据 ─────────────────────────────────────────────────────────────────
+export async function fetchPoliciesFromFeishu(): Promise<SheetData> {
+  return invoke<SheetData>("feishu_fetch_policies");
+}
+
+// ── 保存 PDF ─────────────────────────────────────────────────────────────────
+export async function savePdf(data: Uint8Array, filename: string): Promise<{
+  success: boolean;
+  path?: string;
+  error?: string;
 }> {
-  return invoke("get_policy_stats");
-}
-
-/**
- * 获取政策筛选选项
- */
-export async function getPolicyOptions(): Promise<unknown> {
-  return invoke("get_policy_options");
-}
-
-/**
- * 政策匹配
- */
-export async function matchPolicies(query: unknown): Promise<unknown> {
-  return invoke("match_policies", { queryJson: JSON.stringify(query) });
-}
-
-/**
- * 获取产业字典
- */
-export async function getIndustries(): Promise<unknown> {
-  return invoke("get_industries");
-}
-
-/**
- * 物业载体匹配
- */
-export async function matchProperties(query: unknown): Promise<unknown> {
-  return invoke("match_properties", { queryJson: JSON.stringify(query) });
+  try {
+    const path = await invoke<string>("save_pdf_file", {
+      data: Array.from(data),
+      filename,
+    });
+    return { success: true, path };
+  } catch (err: unknown) {
+    const msg = String(err);
+    if (msg.includes("用户取消") || msg === "用户取消") {
+      return { success: false, error: "用户取消" };
+    }
+    return { success: false, error: msg };
+  }
 }
