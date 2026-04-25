@@ -273,9 +273,14 @@ function parseFeishuRichText(val: unknown): string {
 }
 
 export async function loadPolicies(): Promise<Policy[]> {
+  // Always fetch fresh data — stale empty cache causes blank policy cards.
+  // Subsequent calls within the session get the already-cached (fresh) data.
   return cacheOrRefresh<Policy[]>("policies", async () => {
     const rows = await getPolicySheetRows();
-    if (!rows || rows.length < 2) return [];
+    if (!rows || rows.length < 2) {
+      console.warn("[loadPolicies] No rows, length:", rows?.length);
+      return []; // still cache empty so we don't repeatedly hit API
+    }
       console.warn("[loadPolicies] No rows, length:", rows?.length);
 
     const headers = (rows[0] as unknown[]).map((h: unknown) => String(h || "").trim());
