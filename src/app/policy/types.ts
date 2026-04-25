@@ -18,6 +18,7 @@ export interface PolicyResult {
   subject: string;
   threshold: string;
   cap: string;
+  cat?: string;
   content: string;
   contentHtml: string;
   policyObject: string;

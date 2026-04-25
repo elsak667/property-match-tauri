@@ -15,9 +15,12 @@ export function filterProperties(
     priceMax?: number;
     loadMin?: number;
     heightMin?: number;
+    powerKVMin?: number;
+    park?: string;
+    is104?: string;
   }
 ): Property[] {
-  const { query, type, areaMin, areaMax, priceMax, loadMin, heightMin } = opts;
+  const { query, type, areaMin, areaMax, priceMax, loadMin, heightMin, powerKVMin, park, is104 } = opts;
   return items.filter(p => {
     if (query) {
       const q = query.toLowerCase();
@@ -33,6 +36,9 @@ export function filterProperties(
     if (priceMax && p.priceMin != null && p.priceMin > priceMax) return false;
     if (loadMin && p.load != null && p.load < loadMin) return false;
     if (heightMin && p.height != null && p.height < heightMin) return false;
+    if (powerKVMin && p.powerKV != null && p.powerKV < powerKVMin) return false;
+    if (park && p.park !== park) return false;
+    if (is104 && p.is104Block !== is104) return false;
     return true;
   });
 }
