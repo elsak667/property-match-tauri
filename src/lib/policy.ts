@@ -5,6 +5,34 @@
 
 // Try Tauri HTTP plugin first, fall back to native fetch
 
+// ── 类型声明 ───────────────────────────────────────────────────────────────
+interface IndustryProfiles {
+  description: string;
+  version: string;
+  lastUpdated: string;
+  categories: Array<{
+    name: string;
+    code: string;
+    industries: Array<{
+      code: string;
+      name: string;
+      alias: string[];
+      loadMin: number | null;
+      heightMin: number | null;
+      priceMax: number | null;
+      powerKV: number | null;
+      dualPower: boolean | null;
+      cleanliness: string | null;
+      fireRating: string | null;
+      envAssessment: string | null;
+      special: string[];
+      remark: string;
+    }>;
+  }>;
+}
+
+import profilesData from "../app/property/industry_profiles.json";
+
 // ── 标签映射 ─────────────────────────────────────────────────────────────────
 
 export const IND_LABEL_MAP: Record<string, string> = {
@@ -851,36 +879,27 @@ async function getSheetAsObjects<T = Record<string, unknown>>(sheetName: string,
 // ── 产业字典数据 ─────────────────────────────────────────────────────────────
 
 // 本地 mock fallback（飞书凭证缺失时使用）
-const MOCK_INDUSTRIES_FALLBACK: { categories: IndustryCategory[] } = (() => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const profiles = require("../app/property/industry_profiles.json") as IndustryProfiles;
-    // Convert from IndustryProfiles to { categories: IndustryCategory[] }
-    return {
-      categories: profiles.categories.map(cat => ({
-        name: cat.name,
-        code: cat.code,
-        industries: cat.industries.map(ind => ({
-          code: ind.code,
-          name: ind.name,
-          alias: ind.alias,
-          loadMin: ind.loadMin,
-          heightMin: ind.heightMin,
-          priceMax: ind.priceMax,
-          powerKV: ind.powerKV,
-          dualPower: ind.dualPower,
-          cleanliness: ind.cleanliness,
-          fireRating: ind.fireRating,
-          envAssessment: ind.envAssessment,
-          special: ind.special,
-          remark: ind.remark,
-        })),
-      })),
-    };
-  } catch {
-    return { categories: [] };
-  }
-})();
+const MOCK_INDUSTRIES_FALLBACK: { categories: IndustryCategory[] } = {
+  categories: (profilesData as IndustryProfiles).categories.map(cat => ({
+    name: cat.name,
+    code: cat.code,
+    industries: cat.industries.map(ind => ({
+      code: ind.code,
+      name: ind.name,
+      alias: ind.alias,
+      loadMin: ind.loadMin,
+      heightMin: ind.heightMin,
+      priceMax: ind.priceMax,
+      powerKV: ind.powerKV,
+      dualPower: ind.dualPower,
+      cleanliness: ind.cleanliness,
+      fireRating: ind.fireRating,
+      envAssessment: ind.envAssessment,
+      special: ind.special,
+      remark: ind.remark,
+    })),
+  })),
+};
 
 export interface IndustryProfile {
   code: string;
