@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Mutex;
-use std::time::Duration;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 
@@ -50,28 +49,46 @@ struct PolicyStats {
 }
 
 #[tauri::command]
-async fn get_policy_stats() -> Result<PolicyStats, String> {
-    let client = reqwest::Client::new();
-    let data_resp = client
-        .get("https://pyd.pudong.gov.cn/api/policy/list?page=1&pageSize=1")
-        .timeout(Duration::from_secs(10))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let data_text = data_resp.text().await.map_err(|e| e.to_string())?;
-    let data_json: serde_json::Value =
-        serde_json::from_str(&data_text).map_err(|e| e.to_string())?;
+async fn get_policy_stats(
+    state: tauri::State<'_, feishu::AppState>,
+) -> Result<PolicyStats, String> {
+    let app_id = feishu::get_app_id();
+    let app_secret = feishu::get_app_secret();
 
-    let mut official_count = -1;
-    if let Some(rows) = data_json.pointer("/data/valueRange/values").and_then(|v| v.as_array()) {
-        for row in rows.iter().skip(1) {
-            if let (Some(name), Some(val)) = (row.get(0), row.get(1)) {
-                let n = name.as_str().unwrap_or("");
-                if n == "官网政策总数" {
-                    official_count = val.as_i64().unwrap_or(-1) as i32;
+    let token = feishu::get_valid_token(&state, &app_id, &app_secret).await
+        .map_err(|e| format!("token error: {}", e))?;
+
+    // 拉取政策表前10行，查找"官网政策总数"元数据
+    let rows = feishu::fetch_sheet_values(
+        feishu::POLICY_SHEET,
+        feishu::STATS_SHEET_ID,
+        "A1:B10",
+        &token,
+    ).await.map_err(|e| format!("sheet error: {}", e))?;
+
+    let mut official_count = -1i32;
+    let mut data_row_count = 0i32;
+
+    for row in rows.iter() {
+        if row.is_empty() { continue; }
+        // 第1列是 label，第2列是 value
+        if let (Some(name_val), Some(cnt_val)) = (row.get(0), row.get(1)) {
+            let name = name_val.as_str().unwrap_or("");
+            if name == "官网政策总数" {
+                if let Some(n) = cnt_val.as_i64() {
+                    official_count = n as i32;
+                }
+            } else if name == "数据行数" {
+                if let Some(n) = cnt_val.as_i64() {
+                    data_row_count = n as i32;
                 }
             }
         }
+    }
+
+    // 备用：如果没找到元数据，用行数估算
+    if official_count < 0 {
+        official_count = data_row_count.max(0);
     }
 
     Ok(PolicyStats {
