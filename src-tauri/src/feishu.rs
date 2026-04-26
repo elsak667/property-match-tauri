@@ -75,27 +75,42 @@ pub fn get_app_secret() -> String {
 }
 
 async fn fetch_new_token(app_id: &str, app_secret: &str) -> Result<String, String> {
+    println!("[FEISHU] fetch_new_token called with app_id: {}", app_id);
     let body = serde_json::to_string(&TokenRequest {
         app_id: app_id.to_string(),
         app_secret: app_secret.to_string(),
     }).map_err(|e| e.to_string())?;
 
-    let text = reqwest::Client::new()
+    println!("[FEISHU] Posting to {}", TOKEN_URL);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .danger_accept_invalid_certs(true) // 跳过证书验证测试
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
         .post(TOKEN_URL)
         .header("Content-Type", "application/json")
         .body(body)
         .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
 
-    let resp: TokenResponse = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    if resp.code != 0 {
-        return Err(format!("Token error {}: {}", resp.code, resp.msg));
+    match response {
+        Ok(resp) => {
+            let text = resp.text().await.map_err(|e| e.to_string())?;
+            println!("[FEISHU] Token response: {}", &text[..text.len().min(200)]);
+            let resp: TokenResponse = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+            if resp.code != 0 {
+                return Err(format!("Token error {}: {}", resp.code, resp.msg));
+            }
+            resp.tenant_access_token.ok_or_else(|| "No token".to_string())
+        }
+        Err(e) => {
+            println!("[FEISHU] HTTP error: {:?}", e);
+            Err(format!("HTTP error: {:?}", e))
+        }
     }
-    resp.tenant_access_token.ok_or_else(|| "No token".to_string())
 }
 
 pub async fn fetch_sheet_values(

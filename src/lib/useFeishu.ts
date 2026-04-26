@@ -147,49 +147,7 @@ function calcStars(amount: number): string {
 }
 
 // ── 物业数据转换 ──────────────────────────────────────────────────────────────
-function normalizeProperties(raw: SheetData) {
-  return raw.data.map((row, i) => {
-    const str = (keys: string[]) => {
-      for (const k of keys) {
-        const v = row[k];
-        if (v != null && v !== "") return typeof v === "number" ? String(v) : String(v);
-      }
-      return "";
-    };
-    const num = (keys: string[]) => {
-      for (const k of keys) {
-        const v = row[k];
-        if (v != null) {
-          if (typeof v === "number") return v;
-          if (typeof v === "string") {
-            const n = parseFloat(v);
-            return isNaN(n) ? null : n;
-          }
-        }
-      }
-      return null;
-    };
-    return {
-      id: i + 1,
-      name: str(["楼宇名称", "名称", "name"]) || `载体${i + 1}`,
-      district: str(["区域", "district"]) || "浦东新区",
-      park: str(["归属园区ID", "园区", "park"]) || "",
-      address: str(["地址", "address"]) || "",
-      load: num(["荷载(kg/㎡)", "荷载", "load"]) ?? null,
-      height: num(["层高(m)", "层高", "总层数", "height"]) ?? null,
-      areaMin: num(["面积最小", "最小面积", "areaMin"]) ?? null,
-      areaMax: num(["面积最大", "最大面积", "areaMax"]) ?? null,
-      priceMin: num(["价格最小", "最低租金", "priceMin"]) ?? null,
-      priceMax: num(["价格最大", "最高租金", "priceMax"]) ?? null,
-      type: str(["物业类型", "类型", "type"]) || "",
-      industry: str(["产业方向", "适配行业", "industry"]) || "",
-      contact: str(["联系人", "联系方式", "contact"]) || "",
-      remark: str(["备注", "remark"]) || "",
-      lat: num(["纬度", "lat", "latitude", "纬 度"]) ?? null,
-      lng: num(["经度", "lng", "longitude", "经 度"]) ?? null,
-    };
-  });
-}
+
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -236,7 +194,7 @@ export function usePolicies() {
 }
 
 export function useProperties() {
-  const [properties, setProperties] = useState(PROPERTIES);
+  const [properties] = useState(PROPERTIES);
   const [loading] = useState(false);
   const [fromFeishu] = useState(false);
 
