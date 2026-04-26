@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
+import { getPolicyStats } from "../../lib/tauri";
 import type { PolicyResult } from "./types";
 
 function stripHtml(text: string): string {
@@ -146,6 +147,25 @@ export default function PolicyPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [toast, setToast] = useState<Toast>({ type: "idle", message: "" });
   const [showAll, setShowAll] = useState(false);
+  const [stats, setStats] = useState<{local数据库:number; 官方总数:number; 匹配率:string; 差异:number; 数据来源:string; 官方链接:string} | null>(null);
+
+  // 加载浦易达官网统计
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const s = await getPolicyStats();
+        setStats({
+          local数据库: policies.length,
+          官方总数: s.official_count,
+          匹配率: s.official_count > 0 ? `${Math.round(policies.length / s.official_count * 100)}%` : "—",
+          差异: s.official_count > 0 ? policies.length - s.official_count : 0,
+          数据来源: s.source,
+          官方链接: s.official_link,
+        });
+      } catch { /* ignore */ }
+    }
+    fetchStats();
+  }, [policies.length]);
 
   // 同步 policies → results（按发布时间倒序）
   useEffect(() => {
@@ -240,6 +260,22 @@ export default function PolicyPage() {
           {toast.type === "error" && "❌ "}
           {toast.type === "info" && "ℹ️ "}
           {toast.message}
+        </div>
+      )}
+
+      {stats && (
+        <div className="stats-bar">
+          <span className="stats-bar-label">📊 数据对比</span>
+          <div className="stats-items">
+            <div className="stats-item"><span className="stats-item-num">{stats.local数据库}</span><span className="stats-item-label">本地政策</span></div>
+            <div className="stats-divider" />
+            <div className="stats-item"><span className="stats-item-num">{stats.官方总数 > 0 ? stats.官方总数 : "—"}</span><span className="stats-item-label">官网总数</span></div>
+            <div className="stats-divider" />
+            <div className="stats-item"><span className="stats-item-num" style={{ color: "#059669" }}>{stats.匹配率}</span><span className="stats-item-label">覆盖率</span></div>
+            <div className="stats-divider" />
+            <div className="stats-item"><span className="stats-item-num" style={{ color: stats.差异 >= 0 ? "#1a3a6e" : "#dc2626" }}>{stats.差异 >= 0 ? "+" : ""}{stats.差异}</span><span className="stats-item-label">差异</span></div>
+          </div>
+          <div className="stats-source">{stats.数据来源} <a href={stats.官方链接} target="_blank" rel="noopener noreferrer">浦易达官网 →</a></div>
         </div>
       )}
 
