@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (contains sensitive credentials)
+src-tauri/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
