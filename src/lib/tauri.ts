@@ -34,6 +34,11 @@ export async function fetchPoliciesFromFeishu(): Promise<SheetData> {
   return invoke<SheetData>("feishu_fetch_policies");
 }
 
+// ── 打开外部 URL ─────────────────────────────────────────────────────────────────
+export async function openInBrowser(url: string): Promise<void> {
+  await invoke("open_in_browser", { url });
+}
+
 // ── 保存 PDF ─────────────────────────────────────────────────────────────────
 export async function savePdf(data: Uint8Array, filename: string): Promise<{
   success: boolean;
