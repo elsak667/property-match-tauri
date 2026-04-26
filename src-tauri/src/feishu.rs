@@ -193,7 +193,7 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
                     result.insert("property_error".to_string(), e);
                 }
             }
-            match fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U10", &token).await {
+            match fetch_sheet_values(POLICY_SHEET, STATS_SHEET_ID, "A1:U10", &token).await {
                 Ok(rows) => {
                     result.insert("policy_rows".to_string(), rows.len().to_string());
                     result.insert("policy_sample".to_string(),
@@ -222,41 +222,6 @@ pub async fn feishu_config() -> Result<HashMap<String, String>, String> {
         (!get_app_id().is_empty() && !get_app_secret().is_empty()).to_string()
     );
     Ok(cfg)
-}
-
-#[tauri::command]
-pub async fn feishu_fetch_properties(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
-    let app_id = get_app_id();
-    let app_secret = get_app_secret();
-
-    let token = get_valid_token(&state, &app_id, &app_secret).await?;
-    let rows = fetch_sheet_values(PROPERTY_SHEET, PROPERTY_BUILDING_SHEET_ID, "A1:S500", &token).await?;
-
-    if rows.len() < 3 {
-        return Ok(serde_json::json!({ "headers": [], "data": [] }));
-    }
-
-    let headers: Vec<String> = rows.get(1)
-        .map(|r| r.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_default();
-
-    let data: Vec<serde_json::Value> = rows.iter()
-        .skip(2)
-        .filter_map(|row| {
-            if row.is_empty() || row[0].is_null() {
-                return None;
-            }
-            let mut obj = serde_json::Map::new();
-            for (i, h) in headers.iter().enumerate() {
-                obj.insert(h.clone(), row.get(i).cloned().unwrap_or(serde_json::Value::Null));
-            }
-            Some(serde_json::Value::Object(obj))
-        })
-        .collect();
-
-    Ok(serde_json::json!({ "headers": headers, "data": data }))
 }
 
 #[tauri::command]

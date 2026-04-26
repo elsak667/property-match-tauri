@@ -24,11 +24,6 @@ export async function feishuDebug(): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("feishu_debug");
 }
 
-// ── 物业载体数据 ──────────────────────────────────────────────────────────────
-export async function fetchPropertiesFromFeishu(): Promise<SheetData> {
-  return invoke<SheetData>("feishu_fetch_properties");
-}
-
 // ── 政策数据 ─────────────────────────────────────────────────────────────────
 export async function fetchPoliciesFromFeishu(): Promise<SheetData> {
   return invoke<SheetData>("feishu_fetch_policies");
