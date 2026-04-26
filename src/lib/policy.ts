@@ -591,32 +591,37 @@ export function getStars(rank: number): string {
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
 // Uses Tauri invoke to call Rust backend Feishu proxy commands.
 
-const FEISHU_APP_ID = (typeof import.meta !== 'undefined' && (import.meta as {env?: Record<string, string>}).env?.VITE_FEISHU_APP_ID) || "";
-const FEISHU_APP_SECRET = (typeof import.meta !== 'undefined' && (import.meta as {env?: Record<string, string>}).env?.VITE_FEISHU_APP_SECRET) || "";
-
 const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
 const POLICY_SHEET_ID = "0aad30";
 
 interface TenantToken { token: string; expiresAt: number; }
 let cachedToken: TenantToken | null = null;
 
-async function getTenantToken(): Promise<string> {
-  if (!FEISHU_APP_ID || !FEISHU_APP_SECRET) {
-    throw new Error("飞书凭证未配置，请设置 VITE_FEISHU_APP_ID 和 VITE_FEISHU_APP_SECRET");
+// 凭证缺失时抛出此错误，调用方应降级到 mock 数据
+export class FeishuCredentialsMissing extends Error {
+  constructor() {
+    super("FEISHU_CREDENTIALS_MISSING");
+    this.name = "FeishuCredentialsMissing";
   }
+}
+
+async function getTenantToken(): Promise<string> {
   const now = Date.now();
   if (cachedToken && now < cachedToken.expiresAt - 300000) {
     return cachedToken.token;
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  console.log("[feishu_token] invoke:", typeof invoke, "window.__TAURI_INTERNALS__:", typeof (window as any).__TAURI_INTERNALS__);
-  const token: string = await invoke("feishu_token", {
-    appId: FEISHU_APP_ID,
-    appSecret: FEISHU_APP_SECRET,
-  });
-  console.log("[feishu_token] success, token length:", token.length);
-  cachedToken = { token, expiresAt: now + 3600 * 1000 };
-  return token;
+  try {
+    const token: string = await invoke("feishu_token", {});
+    cachedToken = { token, expiresAt: now + 3600 * 1000 };
+    return token;
+  } catch (e: unknown) {
+    const msg = String(e);
+    if (msg.includes("not set") || msg.includes("未设置") || msg.includes("missing")) {
+      throw new FeishuCredentialsMissing();
+    }
+    throw e;
+  }
 }
 
 async function getSheetData(sheetToken: string, sheetId: string, range?: string): Promise<unknown[][]> {
@@ -845,6 +850,38 @@ async function getSheetAsObjects<T = Record<string, unknown>>(sheetName: string,
 
 // ── 产业字典数据 ─────────────────────────────────────────────────────────────
 
+// 本地 mock fallback（飞书凭证缺失时使用）
+const MOCK_INDUSTRIES_FALLBACK: { categories: IndustryCategory[] } = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const profiles = require("../app/property/industry_profiles.json") as IndustryProfiles;
+    // Convert from IndustryProfiles to { categories: IndustryCategory[] }
+    return {
+      categories: profiles.categories.map(cat => ({
+        name: cat.name,
+        code: cat.code,
+        industries: cat.industries.map(ind => ({
+          code: ind.code,
+          name: ind.name,
+          alias: ind.alias,
+          loadMin: ind.loadMin,
+          heightMin: ind.heightMin,
+          priceMax: ind.priceMax,
+          powerKV: ind.powerKV,
+          dualPower: ind.dualPower,
+          cleanliness: ind.cleanliness,
+          fireRating: ind.fireRating,
+          envAssessment: ind.envAssessment,
+          special: ind.special,
+          remark: ind.remark,
+        })),
+      })),
+    };
+  } catch {
+    return { categories: [] };
+  }
+})();
+
 export interface IndustryProfile {
   code: string;
   name: string;
@@ -907,7 +944,16 @@ interface IndustryCategory {
 
 export async function loadIndustries(): Promise<{ categories: IndustryCategory[] }> {
   return cacheOrRefresh<{ categories: IndustryCategory[] }>("industries", async () => {
-    const rawIndustries = await getSheetAsObjects<RawIndustry>("产业字典", 3);
+    let rawIndustries: RawIndustry[];
+    try {
+      rawIndustries = await getSheetAsObjects<RawIndustry>("产业字典", 3);
+    } catch (e) {
+      if (e instanceof FeishuCredentialsMissing) {
+        console.warn("[loadIndustries] Feishu credentials missing, using mock data");
+        return MOCK_INDUSTRIES_FALLBACK;
+      }
+      throw e;
+    }
 
     const categoryMap = new Map<string, IndustryCategory>();
 
@@ -937,11 +983,20 @@ export async function loadIndustries(): Promise<{ categories: IndustryCategory[]
 
 export async function loadPropertyData(): Promise<{ parks: Park[]; buildings: Building[]; units: Unit[] }> {
   return cacheOrRefresh<{ parks: Park[]; buildings: Building[]; units: Unit[] }>("property_data_v2", async () => {
-    const [parks, buildings, units] = await Promise.all([
-      getSheetAsObjects<Park>("园区", 3),
-      getSheetAsObjects<Building>("楼宇", 3),
-      getSheetAsObjects<Unit>("单元", 3),
-    ]);
+    let parks: Park[], buildings: Building[], units: Unit[];
+    try {
+      [parks, buildings, units] = await Promise.all([
+        getSheetAsObjects<Park>("园区", 3),
+        getSheetAsObjects<Building>("楼宇", 3),
+        getSheetAsObjects<Unit>("单元", 3),
+      ]);
+    } catch (e) {
+      if (e instanceof FeishuCredentialsMissing) {
+        console.warn("[loadPropertyData] Feishu credentials missing, returning empty data");
+        return { parks: [], buildings: [], units: [] };
+      }
+      throw e;
+    }
     return { parks, buildings, units };
   });
 }

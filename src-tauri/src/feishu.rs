@@ -65,13 +65,11 @@ impl Default for TokenCache {
 pub type AppState = Mutex<TokenCache>;
 
 pub fn get_app_id() -> String {
-    // TODO: 替换为真实飞书应用凭证
     std::env::var("FEISHU_APP_ID").ok().filter(|s| !s.is_empty())
         .unwrap_or_else(|| "cli_a950307a10b8dcb1".to_string())
 }
 
 pub fn get_app_secret() -> String {
-    // TODO: 替换为真实飞书应用凭证
     std::env::var("FEISHU_APP_SECRET").ok().filter(|s| !s.is_empty())
         .unwrap_or_else(|| "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj".to_string())
 }
@@ -134,11 +132,9 @@ pub async fn get_valid_token(
     app_id: &str,
     app_secret: &str,
 ) -> Result<String, String> {
-    // 1. 尝试从缓存读取
     let cached_token = {
         let guard = state.lock().map_err(|e| e.to_string())?;
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
-        // 提前5分钟认为过期
         if let (Some(t), Some(exp)) = (&guard.token, guard.expires_at) {
             if exp > now + 300_000 {
                 Some(t.clone())
@@ -154,10 +150,8 @@ pub async fn get_valid_token(
         return Ok(t);
     }
 
-    // 2. 缓存不存在或已过期，重新获取
     let new_token = fetch_new_token(app_id, app_secret).await?;
 
-    // 3. 更新缓存
     {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
         guard.token = Some(new_token.clone());
@@ -188,10 +182,8 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
         Ok(token) => {
             result.insert("status".to_string(), "token_ok".to_string());
             result.insert("token_prefix".to_string(), format!("{}...", &token[..20.min(token.len())]));
-            // 测试拉取一条物业数据
             match fetch_sheet_values(PROPERTY_SHEET, PROPERTY_BUILDING_SHEET_ID, "A1:S5", &token).await {
                 Ok(rows) => {
-                    // rows[0]=中英文表头, rows[1]=英文表头, rows[2+]=数据
                     let data_rows = if rows.len() > 2 { &rows[2..] } else { &[] };
                     result.insert("property_rows".to_string(), data_rows.len().to_string());
                     result.insert("property_sample".to_string(),
@@ -201,7 +193,6 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
                     result.insert("property_error".to_string(), e);
                 }
             }
-            // 测试拉取政策数据
             match fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U10", &token).await {
                 Ok(rows) => {
                     result.insert("policy_rows".to_string(), rows.len().to_string());
@@ -247,7 +238,6 @@ pub async fn feishu_fetch_properties(
         return Ok(serde_json::json!({ "headers": [], "data": [] }));
     }
 
-    // 第1行是标签行，第2行是表头，数据从第3行开始
     let headers: Vec<String> = rows.get(1)
         .map(|r| r.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
@@ -277,14 +267,12 @@ pub async fn feishu_fetch_policies(
     let app_secret = get_app_secret();
 
     let token = get_valid_token(&state, &app_id, &app_secret).await?;
-    // 政策表: 第1行是表头，数据从第2行开始，拉300行确保覆盖全部
     let rows = fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U600", &token).await?;
 
     if rows.len() < 2 {
         return Ok(serde_json::json!({ "headers": [], "data": [] }));
     }
 
-    // 第1行是表头（id, policyName, ...），数据从第2行开始
     let headers: Vec<String> = rows.get(0)
         .map(|r| r.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
@@ -304,4 +292,28 @@ pub async fn feishu_fetch_policies(
         .collect();
 
     Ok(serde_json::json!({ "headers": headers, "data": data }))
+}
+
+/// 获取飞书 tenant token（前端 policy.ts 需要）
+/// 自动从环境变量读取凭证，无需前端传参
+#[tauri::command]
+pub async fn feishu_token() -> Result<String, String> {
+    let app_id = get_app_id();
+    let app_secret = get_app_secret();
+    if app_id.is_empty() || app_secret.is_empty() {
+        return Err("FEISHU_APP_ID or FEISHU_APP_SECRET not set".to_string());
+    }
+    fetch_new_token(&app_id, &app_secret).await
+}
+
+/// 通用飞书 sheet 读取（前端 policy.ts 需要）
+#[tauri::command]
+pub async fn feishu_sheet(
+    token: String,
+    spreadsheet: String,
+    sheet_id: String,
+    range: String,
+) -> Result<serde_json::Value, String> {
+    let rows = fetch_sheet_values(&spreadsheet, &sheet_id, &range, &token).await?;
+    Ok(serde_json::json!({ "code": 0, "data": { "valueRange": { "values": rows } } }))
 }
