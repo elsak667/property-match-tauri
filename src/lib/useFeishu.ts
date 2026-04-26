@@ -7,9 +7,10 @@ import {
   fetchPoliciesFromFeishu,
   type SheetData,
 } from "./tauri";
+import { loadPropertyData } from "./policy";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
 import type { FilterOptions, PolicyResult } from "../app/policy/types";
-import { PROPERTIES } from "../app/property/mockData";
+import type { Unit } from "./policy";
 
 function buildOptions(policies: PolicyResult[]): FilterOptions {
   const locations = new Set<string>();
@@ -194,9 +195,16 @@ export function usePolicies() {
 }
 
 export function useProperties() {
-  const [properties] = useState(PROPERTIES);
-  const [loading] = useState(false);
-  const [fromFeishu] = useState(false);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  return { properties, loading, fromFeishu };
+  useEffect(() => {
+    setLoading(true);
+    loadPropertyData()
+      .then(({ units: u }) => { setUnits(u); })
+      .catch(() => { setUnits([]); })
+      .finally(() => { setLoading(false); });
+  }, []);
+
+  return { properties: units, loading };
 }
