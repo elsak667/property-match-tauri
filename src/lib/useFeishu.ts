@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getFeishuConfig,
-  fetchPropertiesFromFeishu,
   fetchPoliciesFromFeishu,
   type SheetData,
 } from "./tauri";
@@ -238,32 +237,8 @@ export function usePolicies() {
 
 export function useProperties() {
   const [properties, setProperties] = useState(PROPERTIES);
-  const [loading, setLoading] = useState(false);
-  const [fromFeishu, setFromFeishu] = useState(false);
+  const [loading] = useState(false);
+  const [fromFeishu] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const cfg = await getFeishuConfig();
-      if (cfg.has_credentials === "true") {
-        const raw = await fetchPropertiesFromFeishu();
-        if (raw.data.length > 0) {
-          const normalized = normalizeProperties(raw);
-          setProperties(normalized);
-          setFromFeishu(true);
-          setLoading(false);
-          return;
-        }
-      }
-    } catch {
-      // 降级到 mock
-    }
-    setProperties(PROPERTIES);
-    setFromFeishu(false);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  return { properties, loading, fromFeishu, reload: load };
+  return { properties, loading, fromFeishu };
 }

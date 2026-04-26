@@ -3,7 +3,7 @@
 
 use std::sync::Mutex;
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_shell::ShellExt;
+use tauri_plugin_opener::open_url;
 
 #[tauri::command]
 async fn save_pdf_file(app: tauri::AppHandle, data: Vec<u8>, filename: String) -> Result<String, String> {
@@ -24,10 +24,8 @@ async fn save_pdf_file(app: tauri::AppHandle, data: Vec<u8>, filename: String) -
 }
 
 #[tauri::command]
-async fn open_in_browser(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    app.shell()
-        .open(&url, None)
-        .map_err(|e| e.to_string())
+async fn open_in_browser(_app: tauri::AppHandle, url: String) -> Result<(), String> {
+    open_url(&url, None::<&str>).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -107,7 +105,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(Mutex::new(feishu::TokenCache::default()))
         .setup(|app| {
@@ -124,7 +122,6 @@ fn main() {
             save_pdf_file,
             feishu::feishu_config,
             feishu::feishu_debug,
-            feishu::feishu_fetch_properties,
             feishu::feishu_fetch_policies,
             feishu::feishu_token,
             feishu::feishu_sheet,
