@@ -407,22 +407,32 @@ const handleSearch = async () => {
                   return (
                     <div key={buildingId} className={`result-item ${isExpanded ? "expanded" : ""}`}>
                       <div className="result-top" onClick={() => toggleExpand(buildingId)}>
-                        <div className="result-name">
-                          <span className={`score-badge ${best.totalScore >= 90 ? "gold" : best.totalScore >= 75 ? "silver" : "bronze"}`}>
-                            <span className="score-num">{best.totalScore}</span>
-                            <span className="score-pct">%</span>
-                          </span>
-                          {p.park_name} · {p.building_name}
+                        {/* 匹配度徽章 — 左侧固定突出 */}
+                        <div className={`score-badge ${best.totalScore >= 90 ? "gold" : best.totalScore >= 75 ? "silver" : "bronze"}`}>
+                          <span className="score-num">{best.totalScore}</span>
+                          <span className="score-pct">%</span>
                         </div>
+
+                        {/* 载体信息 */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="result-name" style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", lineHeight: 1.4 }}>
+                            {p.park_name}
+                            <span style={{ color: "#94a3b8", fontWeight: 400, margin: "0 4px" }}>·</span>
+                            {p.building_name}
+                          </div>
+                          {p.building_type && (
+                            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{p.building_type}</div>
+                          )}
+                        </div>
+
                         <div className="expand-hint">{isExpanded ? "▲ 收起" : "▼ 展开"}</div>
                       </div>
 
                       <div className="result-meta compact">
-                        <span className="meta-main" style={{ color: "#059669", background: "rgba(5,150,105,.08)" }}>🏗️ 可租 {Math.round(totalLeasable).toLocaleString()}㎡</span>
-                        <span className="meta-main" style={{ color: "#059669", background: "rgba(5,150,105,.08)" }}>📋 空置 {Math.round(totalVacant).toLocaleString()}㎡</span>
-                        <span className="meta-main" style={{ color: "#059669", background: "rgba(5,150,105,.08)" }}>💰 {priceRange}</span>
-                        <span className="meta-main" style={{ color: "#059669", background: "rgba(5,150,105,.08)" }}>🏢 {floors.length}层</span>
-                        <span className="meta-main" style={{ color: "#059669", background: "rgba(5,150,105,.08)" }}>{p.building_type || "研发办公"}</span>
+                        <span className="meta-main">🏗️ 可租 {Math.round(totalLeasable).toLocaleString()}㎡</span>
+                        <span className="meta-main">📋 空置 {Math.round(totalVacant).toLocaleString()}㎡</span>
+                        <span className="meta-main">💰 {priceRange}</span>
+                        <span className="meta-main">🏢 {floors.length}层</span>
                       </div>
 
                       {best.matchReason && best.matchReason !== "基础匹配" && (
