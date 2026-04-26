@@ -3,12 +3,17 @@ import PolicyPage from "./app/policy/PolicyPage";
 import CarrierPage from "./app/carrier/CarrierPage";
 import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
+import { usePolicies, useProperties } from "./lib/useFeishu";
 import "./index.css";
 
 type Page = "home" | "property" | "policy" | "placeholder-invest" | "placeholder-industry";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const { policies } = usePolicies();
+  const { properties } = useProperties();
+  const policyCount = policies.length;
+  const carrierCount = properties.length;
 
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
@@ -23,7 +28,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "#e8eef5" }}>
       <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
       <div className="container">
-        {currentPage === "home" && <HomePage />}
+        {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} />}
         {currentPage === "policy" && <PolicyPage />}
         {currentPage === "property" && <CarrierPage />}
         {currentPage === "placeholder-invest" && (

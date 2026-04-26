@@ -87,8 +87,9 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
     });
     mapInstRef.current = map;
 
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}", {
       maxZoom: 19, minZoom: 12,
+      subdomains: "1234",
     }).addTo(map);
 
     // 右下角图例（用 L.control，与 Desktop 版一致）
