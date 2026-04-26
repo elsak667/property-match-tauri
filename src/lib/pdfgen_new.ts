@@ -46,7 +46,10 @@ function makePolicyPage(p: PolicyResult, i: number, total: number, today: string
   const timeText = isExpired ? "已截止" : `剩余 ${daysLeft} 天`;
 
   const metaItems: string[] = [];
-  if (p.amount != null && p.amount > 0) metaItems.push(`<span class="m"><span class="l">金额</span><strong class="v red">${p.amount}万元</strong></span>`);
+  if (p.amount != null && p.amount > 0) {
+    const amtStr = p.amount >= 10000 ? `${(p.amount / 10000).toFixed(0)}亿` : `${p.amount}万元`;
+    metaItems.push(`<span class="m"><span class="l">最高补贴</span><strong class="v red">${amtStr}</strong></span>`);
+  }
   if (p.end_date) metaItems.push(`<span class="m"><span class="l">申报截止</span><strong class="v">${fmtDate(p.end_date)}</strong></span>`);
   metaItems.push(`<span class="m"><span class="l">剩余时间</span><strong class="v" style="color:${timeColor}">${timeText}</strong></span>`);
   if (p.industry) metaItems.push(`<span class="m"><span class="l">适用行业</span><strong class="v">${esc(p.industry)}</strong></span>`);
@@ -113,7 +116,8 @@ body { width: 210mm; margin: 0 auto; font-family: 'PingFang SC', 'Microsoft YaHe
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%,-50%) rotate(-45deg);
   font-size: 72px; font-weight: 700; color: rgba(25,65,130,0.06);
-  white-space: nowrap; pointer-events: none; z-index: 0; user-select: none;
+  white-space: nowrap; pointer-events: none;
+  z-index: 10; user-select: none;
 }
 .page-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px 10px; border-bottom: 1px solid #e2e8f0; position: relative; z-index: 1; }
 .page-title { font-size: 13px; color: #194182; font-weight: 700; }

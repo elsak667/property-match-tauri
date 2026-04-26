@@ -39,6 +39,19 @@ export async function openInBrowser(url: string): Promise<void> {
   await invoke("open_in_browser", { url });
 }
 
+export interface PolicyStats {
+  local_count: number;
+  official_count: number;
+  coverage: string;
+  diff: number;
+  source: string;
+  official_link: string;
+}
+
+export async function getPolicyStats(): Promise<PolicyStats> {
+  return invoke<PolicyStats>("get_policy_stats");
+}
+
 // ── 保存 PDF ─────────────────────────────────────────────────────────────────
 export async function savePdf(data: Uint8Array, filename: string): Promise<{
   success: boolean;
