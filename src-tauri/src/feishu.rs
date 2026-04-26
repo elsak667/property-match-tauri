@@ -136,7 +136,7 @@ async fn get_valid_token(
     // 1. 尝试从缓存读取
     let cached_token = {
         let guard = state.lock().map_err(|e| e.to_string())?;
-        let now = chrono::Utc::now().timestamp_millis();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
         // 提前5分钟认为过期
         if let (Some(t), Some(exp)) = (&guard.token, guard.expires_at) {
             if exp > now + 300_000 {
@@ -160,7 +160,7 @@ async fn get_valid_token(
     {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
         guard.token = Some(new_token.clone());
-        guard.expires_at = Some(chrono::Utc::now().timestamp_millis() + 7200_000);
+        guard.expires_at = Some(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64 + 7200_000);
     }
 
     Ok(new_token)
