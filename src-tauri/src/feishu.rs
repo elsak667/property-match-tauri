@@ -13,8 +13,9 @@ const SHEET_VALUES_URL: &str = "https://open.feishu.cn/open-apis/sheets/v2/sprea
 const PROPERTY_SHEET: &str = "X1jRs1PhLhR8WetSwktcM9Fgnhg";
 const PROPERTY_BUILDING_SHEET_ID: &str = "4hdJSh"; // 楼宇
 
-const POLICY_SHEET: &str = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-const POLICY_SHEET_ID: &str = "0aad30";
+pub const POLICY_SHEET: &str = "DwqqsS6TShlGhAteDf3cHRwvnHe";
+pub const POLICY_SHEET_ID: &str = "0aad30";
+pub const STATS_SHEET_ID: &str = "2pLPm8";
 
 // ── 数据结构 ──────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,13 +64,13 @@ impl Default for TokenCache {
 
 pub type AppState = Mutex<TokenCache>;
 
-fn get_app_id() -> String {
+pub fn get_app_id() -> String {
     // TODO: 替换为真实飞书应用凭证
     std::env::var("FEISHU_APP_ID").ok().filter(|s| !s.is_empty())
         .unwrap_or_else(|| "cli_a950307a10b8dcb1".to_string())
 }
 
-fn get_app_secret() -> String {
+pub fn get_app_secret() -> String {
     // TODO: 替换为真实飞书应用凭证
     std::env::var("FEISHU_APP_SECRET").ok().filter(|s| !s.is_empty())
         .unwrap_or_else(|| "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj".to_string())
@@ -99,7 +100,7 @@ async fn fetch_new_token(app_id: &str, app_secret: &str) -> Result<String, Strin
     resp.tenant_access_token.ok_or_else(|| "No token".to_string())
 }
 
-async fn fetch_sheet_values(
+pub async fn fetch_sheet_values(
     spreadsheet_token: &str,
     sheet_id: &str,
     range: &str,
@@ -128,7 +129,7 @@ async fn fetch_sheet_values(
 }
 
 /// 获取有效 token（优先缓存，过期则刷新）
-async fn get_valid_token(
+pub async fn get_valid_token(
     state: &State<'_, AppState>,
     app_id: &str,
     app_secret: &str,
