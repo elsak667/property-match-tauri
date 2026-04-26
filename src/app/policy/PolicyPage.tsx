@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { generatePdfBytes } from "../../lib/pdfgen_new";
-import { savePdf } from "../../lib/tauri";
+import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
 import type { PolicyResult } from "./types";
@@ -139,7 +138,6 @@ export default function PolicyPage() {
   const [industries, setIndustries] = useState<string[]>([]);
   const [caps, setCaps] = useState<string[]>([]);
   const [dept, setDept] = useState("");
-  const [cat, setCat] = useState("");
   const [results, setResults] = useState<PolicyResult[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -173,7 +171,6 @@ export default function PolicyPage() {
         location,
         dept,
         caps,
-        cats: cat ? [cat] : [],
       });
       // 按发布时间倒序
       const sorted = [...filtered].sort((a, b) => {
@@ -184,7 +181,7 @@ export default function PolicyPage() {
       setResults(sorted);
       setMatchLoading(false);
     }, 300);
-  }, [policies, query, industries, location, dept, caps, cat]);
+  }, [policies, query, industries, location, dept, caps]);
 
   useEffect(() => {
     const t = setTimeout(doMatch, 300);
@@ -219,7 +216,6 @@ export default function PolicyPage() {
     setIndustries([]);
     setCaps([]);
     setDept("");
-    setCat("");
     setExpanded(new Set());
     setSelected(new Set());
   }
@@ -228,22 +224,11 @@ export default function PolicyPage() {
     if (selected.size === 0) { showToast("error", "请先选择要导出的政策"); return; }
     const selectedItems = results.filter(r => selected.has(r.name || ""));
     if (selectedItems.length === 0) { showToast("error", "请先选择要导出的政策"); return; }
-    try {
-      const result = await generatePdfBytes(selectedItems, companyName || "某企业");
-      if (!result.success) { showToast("error", "PDF 生成失败: " + (result.error || "未知错误")); return; }
-      if (!result.data || !result.filename) { showToast("error", "PDF 生成失败：无数据"); return; }
-      const saveResult = await savePdf(result.data, result.filename);
-      if (!saveResult.success && saveResult.error && saveResult.error !== "用户取消") {
-        showToast("error", "保存失败: " + saveResult.error);
-      } else if (saveResult.success && saveResult.path) {
-        showToast("success", "PDF 已保存至：" + saveResult.path);
-      }
-    } catch (err: unknown) {
-      showToast("error", "导出失败: " + String(err));
-    }
+    await openPrintHtml(selectedItems, companyName || "某企业");
+    showToast("info", "浏览器已打开，请在浏览器中打印保存为 PDF");
   }
 
-  const activeFiltersCount = [industries.length > 0, caps.length > 0, !!location, !!dept, !!cat, !!query.trim()].filter(Boolean).length;
+  const activeFiltersCount = [industries.length > 0, caps.length > 0, !!location, !!dept, !!query.trim()].filter(Boolean).length;
   const hasFilters = activeFiltersCount > 0;
   const isLoading = dataLoading || matchLoading;
 
@@ -343,21 +328,7 @@ export default function PolicyPage() {
             </div>
           )}
 
-          {options.cats.length > 0 && (
-            <div className="filter-section">
-              <div className="filter-label">🏷️ 政策分类</div>
-              <select
-                className="filter-select"
-                value={cat}
-                onChange={e => setCat(e.target.value)}
-                aria-label="政策分类筛选"
-              >
-                <option value="">全部</option>
-                {options.cats.map(c => <option key={c.k} value={c.k}>{c.l}</option>)}
-              </select>
-            </div>
-          )}
-
+          
           <div className="form-actions">
             <button className="btn-secondary" onClick={resetAll}>重置全部</button>
             <button className="btn-primary" onClick={doMatch}>开始匹配</button>
@@ -392,7 +363,7 @@ export default function PolicyPage() {
 
           {showExport && (
             <div className="export-panel">
-              <div className="export-title">导出政策清单 PDF</div>
+              <div className="export-title">导出政策清单</div>
               <div className="export-row">
                 <input
                   id="company-input"
@@ -405,7 +376,7 @@ export default function PolicyPage() {
                   style={{ maxWidth: "200px" }}
                 />
                 <button className="btn-primary" onClick={exportPdf} disabled={selected.size === 0}>
-                  生成 PDF ({selected.size} 条)
+                  打印导出 ({selected.size} 条)
                 </button>
                 <button className="btn-secondary" onClick={selectAll}>全选</button>
                 <button className="btn-secondary" onClick={clearSelection}>清空</button>
@@ -448,7 +419,7 @@ export default function PolicyPage() {
           {results.length > 0 && (
             <div className="content-footer">
               {!showExport && (
-                <button className="btn-primary" onClick={() => setShowExport(true)}>📥 导出政策清单</button>
+                <button className="btn-primary" onClick={() => setShowExport(true)}>📥 导出/打印政策</button>
               )}
               <button className="btn-secondary" onClick={doMatch}>🔄 重新匹配</button>
             </div>

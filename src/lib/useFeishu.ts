@@ -19,16 +19,14 @@ function buildOptions(policies: PolicyResult[]): FilterOptions {
   const subjects = new Set<string>();
   const caps = new Set<string>();
   const thresholds = new Set<string>();
-  const cats = new Set<string>();
 
   for (const p of policies) {
     if (p.area) for (const a of p.area.split(/[/\n]/)) { const t = a.trim(); if (t) locations.add(t); }
     if (p.industry) for (const i of p.industry.split(/[/\n]/)) { const t = i.trim(); if (t) industries.add(t); }
     if (p.dept) depts.add(p.dept);
     if (p.subject) subjects.add(p.subject);
-    if (p.cap) caps.add(p.cap);
+    if (p.cap) for (const c of p.cap.split(/[/\n]/)) { const t = c.trim(); if (t) caps.add(t); }
     if (p.threshold) thresholds.add(p.threshold);
-    if (p.cat) cats.add(p.cat);
   }
 
   const make = (set: Set<string>) =>
@@ -41,7 +39,6 @@ function buildOptions(policies: PolicyResult[]): FilterOptions {
     subjects: make(subjects),
     caps: make(caps),
     thresholds: make(thresholds),
-    cats: make(cats),
     total: policies.length,
   };
 }
@@ -218,7 +215,6 @@ export function usePolicies() {
             ...built,
             caps: built.caps.length > 0 ? built.caps : MOCK_OPTIONS.caps,
             thresholds: built.thresholds.length > 0 ? built.thresholds : MOCK_OPTIONS.thresholds,
-            cats: built.cats.length > 0 ? built.cats : MOCK_OPTIONS.cats,
           };
           setOptions(opts);
           setFromFeishu(true);
