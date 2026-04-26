@@ -42,6 +42,5 @@ export interface FilterOptions {
   caps: FilterOption[];
   thresholds: FilterOption[];
   depts: FilterOption[];
-  cats: FilterOption[];
   total: number;
 }

@@ -121,11 +121,6 @@ export const MOCK_OPTIONS: FilterOptions = {
     { k: "shengwu", l: "浦东新区生物医药促进中心", cnt: 1 },
     { k: "rensheju", l: "浦东新区人社局", cnt: 1 },
   ],
-  cats: [
-    { k: "industry", l: "产业专项", cnt: 5 },
-    { k: "talent", l: "人才政策", cnt: 1 },
-    { k: "tax", l: "税费优惠", cnt: 2 },
-  ],
   total: MOCK_POLICIES.length,
 };
 
@@ -147,10 +142,9 @@ export function filterPolicies(
     location?: string;
     dept?: string;
     caps?: string[];
-    cats?: string[];
   },
 ): PolicyResult[] {
-  const { query, industry, location, dept, caps = [], cats = [] } = opts;
+  const { query, industry, location, dept, caps = [] } = opts;
   return policies.filter(p => {
     const q = (query || "").toLowerCase();
     const matchQuery = !q || !p.name || p.name.toLowerCase().includes(q) ||
@@ -159,7 +153,6 @@ export function filterPolicies(
     const matchLocation = !location || !p.area || p.area.includes(location);
     const matchDept = !dept || p.dept?.includes(dept);
     const matchCap = caps.length === 0 || caps.some(c => p.cap?.includes(c) || c === p.cap);
-    const matchCat = cats.length === 0 || cats.some(c => p.cat === c);
-    return matchQuery && matchIndustry && matchLocation && matchDept && matchCap && matchCat;
+    return matchQuery && matchIndustry && matchLocation && matchDept && matchCap;
   });
 }
