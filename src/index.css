@@ -145,6 +145,16 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 .hot-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(239,68,68,.1); color: #dc2626; border: 1px solid rgba(239,68,68,.2); }
 .expired-badge { font-size: 11px; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 10px; }
 
+/* ─── Floor Table ─── */
+.floor-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.floor-table-header { display: flex; background: rgba(59,109,181,.06); border-bottom: 1px solid rgba(59,109,181,.15); padding: 6px 8px; font-weight: 600; color: #3b6db5; }
+.floor-table-header span { flex: 1; padding: 0 6px; }
+.floor-table-header span:first-child { flex: 0.7; }
+.floor-table-row { display: flex; border-bottom: 1px solid rgba(0,0,0,.06); padding: 7px 8px; align-items: center; }
+.floor-table-row:last-child { border-bottom: none; }
+.floor-table-row span { flex: 1; padding: 0 6px; color: #374151; }
+.floor-table-row span:first-child { flex: 0.7; font-weight: 500; color: #1e293b; }
+
 /* ─── Details ─── */
 .result-details { border-top: 1px dashed rgba(59,109,181,.2); padding-top: 12px; margin-top: 8px; }
 .detail-section { margin-bottom: 14px; }
