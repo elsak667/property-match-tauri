@@ -176,7 +176,53 @@ pub async fn get_valid_token(
     Ok(new_token)
 }
 
+// ── 新闻配置 ────────────────────────────────────────────────────────────────────
+pub const NEWS_SHEET: &str = "OWV2sO5l9h6qWFtZKfic34k9nFg";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewsItem {
+    pub time: String,
+    pub category: String,
+    pub title: String,
+    pub link: String,
+    pub summary: String,
+}
+
 // ── Tauri 命令 ───────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn feishu_fetch_news(
+    state: State<'_, AppState>,
+) -> Result<Vec<NewsItem>, String> {
+    let app_id = get_app_id();
+    let app_secret = get_app_secret();
+
+    let token = get_valid_token(&state, &app_id, &app_secret).await?;
+
+    let rows = fetch_sheet_values(NEWS_SHEET, "0", "A1:E100", &token).await?;
+
+    if rows.len() < 2 {
+        return Ok(vec![]);
+    }
+
+    let items: Vec<NewsItem> = rows.iter()
+        .skip(1)
+        .filter_map(|row| {
+            if row.is_empty() || row.first()?.is_null() {
+                return None;
+            }
+            Some(NewsItem {
+                time: row.get(0).and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+                category: row.get(1).and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+                title: row.get(2).and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+                link: row.get(3).and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+                summary: row.get(4).and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+            })
+        })
+        .collect();
+
+    Ok(items)
+}
 
 #[tauri::command]
 pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
