@@ -1,7 +1,8 @@
 /**
  * 飞书 API 集成 — Rust 后端
- * 凭证从 .env 文件读取，请复制 .env.example 为 .env 后填入真实值
+ * 凭证以 Base64 混淆存储，运行时解码
  */
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -10,7 +11,18 @@ use tauri::State;
 const TOKEN_URL: &str = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
 const SHEET_VALUES_URL: &str = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
 
-// ── Spreadsheet 配置（从环境变量读取）────────────────────────────────────────
+// ── 混淆凭证（Base64 编码，运行前解码）────────────────────────────────────────
+const ENC_APP_ID: &str = "Y2xpX2E5NTAzMDdhMTBiOGRjYjE=";
+const ENC_APP_SECRET: &str = "VEZsQmoxNjBKbTRwNDh1WjN0NFJFVHBMM3F6MW94YWo=";
+
+fn decode_creds(encoded: &str) -> String {
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+        .unwrap_or_else(|_| encoded.to_string())
+}
+
+// ── Spreadsheet 配置（从环境变量读取，兜底硬编码）──────────────────────────────
 fn get_property_sheet() -> String {
     std::env::var("PROPERTY_SHEET").unwrap_or_else(|_| "X1jRs1PhLhR8WetSwktcM9Fgnhg".to_string())
 }
@@ -81,11 +93,15 @@ impl Default for TokenCache {
 pub type AppState = Mutex<TokenCache>;
 
 pub fn get_app_id() -> String {
-    std::env::var("FEISHU_APP_ID").expect("FEISHU_APP_ID not set in .env")
+    std::env::var("FEISHU_APP_ID")
+        .ok()
+        .unwrap_or_else(|| decode_creds(ENC_APP_ID))
 }
 
 pub fn get_app_secret() -> String {
-    std::env::var("FEISHU_APP_SECRET").expect("FEISHU_APP_SECRET not set in .env")
+    std::env::var("FEISHU_APP_SECRET")
+        .ok()
+        .unwrap_or_else(|| decode_creds(ENC_APP_SECRET))
 }
 
 async fn fetch_new_token(app_id: &str, app_secret: &str) -> Result<String, String> {
