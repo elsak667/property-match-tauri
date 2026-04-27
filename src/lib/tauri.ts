@@ -47,6 +47,15 @@ export async function openInBrowser(url: string): Promise<void> {
   await invoke("open_in_browser", { url });
 }
 
+// ── 本地缓存 ─────────────────────────────────────────────────────────────────
+export async function feishuCacheRead(key: string): Promise<unknown> {
+  return invoke("feishu_cache_read", { key });
+}
+
+export async function feishuCacheWrite(key: string, data: unknown): Promise<void> {
+  return invoke("feishu_cache_write", { key, data });
+}
+
 export interface PolicyStats {
   local_count: number;
   official_count: number;

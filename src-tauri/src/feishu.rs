@@ -198,9 +198,37 @@ pub async fn feishu_fetch_news(
     let app_id = get_app_id();
     let app_secret = get_app_secret();
 
-    let token = get_valid_token(&state, &app_id, &app_secret).await?;
+    let token = match get_valid_token(&state, &app_id, &app_secret).await {
+        Ok(t) => t,
+        Err(e) => {
+            println!("[FEISHU] news token failed: {}, trying local cache", e);
+            if let Some(cached) = read_cache("news") {
+                if let Some(arr) = cached.as_array() {
+                    let items: Vec<NewsItem> = arr.iter().filter_map(|v| {
+                        serde_json::from_value(v.clone()).ok()
+                    }).collect();
+                    return Ok(items);
+                }
+            }
+            return Err(e);
+        }
+    };
 
-    let rows = fetch_sheet_values(NEWS_SHEET, NEWS_SHEET_ID, "A1:E100", &token).await?;
+    let rows = match fetch_sheet_values(NEWS_SHEET, NEWS_SHEET_ID, "A1:E100", &token).await {
+        Ok(r) => r,
+        Err(e) => {
+            println!("[FEISHU] news sheet failed: {}, trying local cache", e);
+            if let Some(cached) = read_cache("news") {
+                if let Some(arr) = cached.as_array() {
+                    let items: Vec<NewsItem> = arr.iter().filter_map(|v| {
+                        serde_json::from_value(v.clone()).ok()
+                    }).collect();
+                    return Ok(items);
+                }
+            }
+            return Err(e);
+        }
+    };
 
     if rows.len() < 2 {
         return Ok(vec![]);
@@ -221,6 +249,9 @@ pub async fn feishu_fetch_news(
             })
         })
         .collect();
+
+    // 写本地缓存
+    write_cache("news", &items);
 
     Ok(items)
 }
@@ -293,8 +324,30 @@ pub async fn feishu_fetch_policies(
     let app_id = get_app_id();
     let app_secret = get_app_secret();
 
-    let token = get_valid_token(&state, &app_id, &app_secret).await?;
-    let rows = fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U600", &token).await?;
+    let token = match get_valid_token(&state, &app_id, &app_secret).await {
+        Ok(t) => t,
+        Err(e) => {
+            // 飞书连接失败，尝试本地缓存
+            println!("[FEISHU] token failed: {}, trying local cache", e);
+            if let Some(cached) = read_cache("policy_data") {
+                println!("[FEISHU] Using cached policy_data");
+                return Ok(cached);
+            }
+            return Err(e);
+        }
+    };
+
+    let rows = match fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U600", &token).await {
+        Ok(r) => r,
+        Err(e) => {
+            println!("[FEISHU] sheet read failed: {}, trying local cache", e);
+            if let Some(cached) = read_cache("policy_data") {
+                println!("[FEISHU] Using cached policy_data");
+                return Ok(cached);
+            }
+            return Err(e);
+        }
+    };
 
     if rows.len() < 2 {
         return Ok(serde_json::json!({ "headers": [], "data": [] }));
@@ -318,7 +371,9 @@ pub async fn feishu_fetch_policies(
         })
         .collect();
 
-    Ok(serde_json::json!({ "headers": headers, "data": data }))
+    let result = serde_json::json!({ "headers": headers, "data": data });
+    write_cache("policy_data", &result);
+    Ok(result)
 }
 
 /// 获取飞书 tenant token（前端 policy.ts 需要）
@@ -343,4 +398,40 @@ pub async fn feishu_sheet(
 ) -> Result<serde_json::Value, String> {
     let rows = fetch_sheet_values(&spreadsheet, &sheet_id, &range, &token).await?;
     Ok(serde_json::json!({ "code": 0, "data": { "valueRange": { "values": rows } } }))
+}
+
+// ── 本地文件缓存 ─────────────────────────────────────────────────────────────
+
+fn cache_dir() -> std::path::PathBuf {
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    home.join("Library/Application Support/property-match-tauri/feishu_cache")
+}
+
+fn write_cache(key: &str, data: &impl serde::Serialize) {
+    let dir = cache_dir();
+    if std::fs::create_dir_all(&dir).is_err() { return; }
+    let path = dir.join(format!("{key}.json"));
+    if let Ok(text) = serde_json::to_string_pretty(data) {
+        let _ = std::fs::write(&path, &text);
+        println!("[CACHE] wrote {}.json", key);
+    }
+}
+
+fn read_cache(key: &str) -> Option<serde_json::Value> {
+    let path = cache_dir().join(format!("{key}.json"));
+    let text = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+#[tauri::command]
+pub fn feishu_cache_read(key: String) -> Result<Option<serde_json::Value>, String> {
+    Ok(read_cache(&key))
+}
+
+#[tauri::command]
+pub fn feishu_cache_write(key: String, data: serde_json::Value) -> Result<(), String> {
+    write_cache(&key, &data);
+    Ok(())
 }
