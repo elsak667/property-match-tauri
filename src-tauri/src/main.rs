@@ -123,6 +123,7 @@ fn main() {
             feishu::feishu_config,
             feishu::feishu_debug,
             feishu::feishu_fetch_policies,
+            feishu::feishu_fetch_news,
             feishu::feishu_token,
             feishu::feishu_sheet,
             open_in_browser,

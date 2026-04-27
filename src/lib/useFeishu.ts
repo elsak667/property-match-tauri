@@ -5,7 +5,9 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getFeishuConfig,
   fetchPoliciesFromFeishu,
+  fetchNewsFromFeishu,
   type SheetData,
+  type NewsItem,
 } from "./tauri";
 import { loadPropertyData } from "./policy";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
@@ -207,4 +209,28 @@ export function useProperties() {
   }, []);
 
   return { properties: units, loading };
+}
+
+export function useNews() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const cfg = await getFeishuConfig();
+      if (cfg.has_credentials === "true") {
+        const items = await fetchNewsFromFeishu();
+        setNews(items);
+      }
+    } catch {
+      // 静默失败，news 为空
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  return { news, loading, reload: load };
 }
