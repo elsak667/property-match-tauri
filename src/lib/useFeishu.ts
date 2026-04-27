@@ -223,8 +223,8 @@ export function useNews() {
         const items = await fetchNewsFromFeishu();
         setNews(items);
       }
-    } catch {
-      // 静默失败，news 为空
+} catch (e) {
+      console.error("[useNews] fetch error:", e);
     } finally {
       setLoading(false);
     }

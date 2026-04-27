@@ -1,5 +1,5 @@
 /**
- * 产业快讯滚动字幕条
+ * 产业快讯 — 左侧竖排滚动面板
  */
 import { useState } from "react";
 import { openInBrowser } from "../lib/tauri";
@@ -36,9 +36,11 @@ export default function NewsTicker({ news }: Props) {
 
   if (news.length === 0) {
     return (
-      <div className="news-ticker news-ticker--empty">
-        <span className="news-ticker-icon">📰</span>
-        <span className="news-ticker-label">产业快讯</span>
+      <div className="news-ticker">
+        <div className="news-ticker-header">
+          <span>📰</span>
+          <span className="news-ticker-label">产业快讯</span>
+        </div>
         <span className="news-ticker-empty-text">暂无快讯内容</span>
       </div>
     );
@@ -52,41 +54,31 @@ export default function NewsTicker({ news }: Props) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="news-ticker-label-wrap">
-        <span className="news-ticker-icon">📰</span>
+      <div className="news-ticker-header">
+        <span>📰</span>
         <span className="news-ticker-label">产业快讯</span>
-        <span className="news-ticker-divider" />
       </div>
 
       <div className="news-ticker-track-wrap">
         <div className={`news-ticker-track${paused ? " paused" : ""}`}>
           {items.map((item, i) => (
-            <span key={i} className="news-ticker-item">
-              <span className="news-ticker-time">{item.time}</span>
-              <span
-                className="news-ticker-cat"
-                style={{ background: getColor(item.category) }}
-              >
-                {item.category}
-              </span>
-              {item.link ? (
-                <a
-                  className="news-ticker-title"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openInBrowser(item.link);
-                  }}
-                  title={item.summary || item.title}
+            <div
+              key={i}
+              className="news-ticker-item"
+              onClick={() => item.link && openInBrowser(item.link)}
+              title={item.summary || item.title}
+            >
+              <div className="news-ticker-meta">
+                <span className="news-ticker-time">{item.time}</span>
+                <span
+                  className="news-ticker-cat"
+                  style={{ background: getColor(item.category) }}
                 >
-                  {item.title}
-                </a>
-              ) : (
-                <span className="news-ticker-title" title={item.summary || item.title}>
-                  {item.title}
+                  {item.category}
                 </span>
-              )}
-              <span className="news-ticker-sep">●</span>
-            </span>
+              </div>
+              <span className="news-ticker-title">{item.title}</span>
+            </div>
           ))}
         </div>
       </div>
