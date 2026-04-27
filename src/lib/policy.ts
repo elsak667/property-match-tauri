@@ -308,9 +308,8 @@ export async function loadPolicies(): Promise<Policy[]> {
     const rows = await getPolicySheetRows();
     if (!rows || rows.length < 2) {
       console.warn("[loadPolicies] No rows, length:", rows?.length);
-      return []; // still cache empty so we don't repeatedly hit API
+      return [];
     }
-      console.warn("[loadPolicies] No rows, length:", rows?.length);
 
     const headers = (rows[0] as unknown[]).map((h: unknown) => String(h || "").trim());
     console.log("[loadPolicies] headers:", headers.slice(0,8), "| rows:", rows.length);
@@ -989,7 +988,8 @@ export async function loadIndustries(): Promise<{ categories: IndustryCategory[]
         });
       }
 
-      categoryMap.get(catCode)!.industries.push(parseIndustry(raw));
+      const cat = categoryMap.get(catCode);
+      if (cat) cat.industries.push(parseIndustry(raw));
     }
 
     const categories = Array.from(categoryMap.values())

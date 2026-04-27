@@ -5,6 +5,12 @@ use std::sync::Mutex;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::open_url;
 
+fn init_env() {
+    for path in ["../.env", ".env"] {
+        let _ = dotenvy::from_filename(path);
+    }
+}
+
 #[tauri::command]
 async fn save_pdf_file(app: tauri::AppHandle, data: Vec<u8>, filename: String) -> Result<String, String> {
     let file_path = app
@@ -58,8 +64,8 @@ async fn get_policy_stats(
 
     // 拉取政策表前10行，查找"官网政策总数"元数据
     let rows = feishu::fetch_sheet_values(
-        feishu::POLICY_SHEET,
-        feishu::STATS_SHEET_ID,
+        &feishu::get_policy_sheet(),
+        &feishu::get_stats_sheet_id(),
         "A1:B10",
         &token,
     ).await.map_err(|e| format!("sheet error: {}", e))?;
@@ -108,9 +114,10 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(Mutex::new(feishu::TokenCache::default()))
-        .setup(|app| {
+        .setup(|_app| {
+            init_env();
             if cfg!(debug_assertions) {
-                app.handle().plugin(
+                _app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
                         .build(),

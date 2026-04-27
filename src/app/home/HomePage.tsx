@@ -3,6 +3,12 @@
  */
 import NewsTicker from "../../components/NewsTicker";
 
+declare global {
+  interface Window {
+    __setPage__?: (page: string) => void;
+  }
+}
+
 interface ChangelogEntry {
   version: string;
   date: string;
@@ -99,7 +105,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
         <div className="module-grid">
           <div
             className="module-card module-active"
-            onClick={() => (window as any).__setPage__?.("policy")}
+            onClick={() => window.__setPage__?.("policy")}
           >
             <div className="module-icon">📋</div>
             <div className="module-info">
@@ -120,7 +126,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
 
           <div
             className="module-card module-placeholder"
-            onClick={() => (window as any).__setPage__?.("placeholder-invest")}
+            onClick={() => window.__setPage__?.("placeholder-invest")}
           >
             <div className="module-icon">📊</div>
             <div className="module-info">
@@ -143,7 +149,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
         <div className="module-grid">
           <div
             className="module-card module-active"
-            onClick={() => (window as any).__setPage__?.("property")}
+            onClick={() => window.__setPage__?.("property")}
           >
             <div className="module-icon">🏢</div>
             <div className="module-info">
@@ -163,7 +169,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
 
           <div
             className="module-card module-placeholder"
-            onClick={() => (window as any).__setPage__?.("placeholder-industry")}
+            onClick={() => window.__setPage__?.("placeholder-industry")}
           >
             <div className="module-icon">🗺️</div>
             <div className="module-info">

@@ -2,7 +2,6 @@
  * 产业快讯 — 左侧竖排滚动面板
  */
 import { useState } from "react";
-import { openInBrowser } from "../lib/tauri";
 
 interface NewsItem {
   time: string;
@@ -33,13 +32,14 @@ function getColor(cat: string): string {
 
 function parseDate(timeStr: string): Date {
   const [month, day] = timeStr.split(" ")[0].split("/");
-  return new Date(2026, parseInt(month) - 1, parseInt(day));
+  const year = new Date().getFullYear();
+  return new Date(year, parseInt(month) - 1, parseInt(day));
 }
 
 export default function NewsTicker({ news }: Props) {
   const [paused, setPaused] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<NewsItem | null>(null);
 
-  // 近一周过滤
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
   const recent = news.filter((n) => {
@@ -78,8 +78,8 @@ export default function NewsTicker({ news }: Props) {
             <div
               key={i}
               className="news-ticker-item"
-              onClick={() => item.link && openInBrowser(item.link)}
-              title={item.summary || item.title}
+              onMouseEnter={() => setHoveredItem(item)}
+              onMouseLeave={() => setHoveredItem(null)}
             >
               <div className="news-ticker-meta">
                 <span
@@ -97,6 +97,22 @@ export default function NewsTicker({ news }: Props) {
           ))}
         </div>
       </div>
+
+      {hoveredItem && hoveredItem.summary && (
+        <div className="news-ticker-tooltip">
+          <div className="tooltip-header">
+            <span
+              className="tooltip-cat"
+              style={{ background: getColor(hoveredItem.category) }}
+            >
+              {hoveredItem.category}
+            </span>
+            <span className="tooltip-time">{hoveredItem.time}</span>
+          </div>
+          <div className="tooltip-title">{hoveredItem.title}</div>
+          <div className="tooltip-summary">{hoveredItem.summary}</div>
+        </div>
+      )}
     </div>
   );
 }
