@@ -24,6 +24,19 @@ export async function feishuDebug(): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("feishu_debug");
 }
 
+// ── 新闻数据 ─────────────────────────────────────────────────────────────────
+export interface NewsItem {
+  time: string;
+  category: string;
+  title: string;
+  link: string;
+  summary: string;
+}
+
+export async function fetchNewsFromFeishu(): Promise<NewsItem[]> {
+  return invoke<NewsItem[]>("feishu_fetch_news");
+}
+
 // ── 政策数据 ─────────────────────────────────────────────────────────────────
 export async function fetchPoliciesFromFeishu(): Promise<SheetData> {
   return invoke<SheetData>("feishu_fetch_policies");

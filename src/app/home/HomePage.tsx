@@ -1,6 +1,7 @@
 /**
  * 首页 — 平台介绍 + 模块入口
  */
+import NewsTicker from "../../components/NewsTicker";
 
 interface ChangelogEntry {
   version: string;
@@ -8,9 +9,18 @@ interface ChangelogEntry {
   changes: string[];
 }
 
+interface NewsItem {
+  time: string;
+  category: string;
+  title: string;
+  link: string;
+  summary: string;
+}
+
 interface Props {
   policyCount: number;
   carrierCount: number;
+  news: NewsItem[];
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
@@ -34,11 +44,23 @@ export const CHANGELOG: ChangelogEntry[] = [
       "产业参数推荐（荷载/层高/双回路供电）",
     ],
   },
+  {
+    version: "v2.1",
+    date: "2026-04",
+    changes: [
+      "上线产业快讯滚动播报",
+      "支持飞书表格维护新闻内容",
+      "类别颜色标签 + 链接跳转",
+    ],
+  },
 ];
 
-export default function HomePage({ policyCount, carrierCount }: Props) {
+export default function HomePage({ policyCount, carrierCount, news }: Props) {
   return (
     <div className="container">
+      {/* 产业快讯滚动条 */}
+      <NewsTicker news={news} />
+
       {/* Banner */}
       <div className="home-banner">
         <div className="banner-left">
@@ -48,7 +70,7 @@ export default function HomePage({ policyCount, carrierCount }: Props) {
             整合物业载体资源与政策信息，赋能一线招商团队
           </p>
           <div className="banner-meta">
-            <span>v1.0 · Tauri v2 · React 18</span>
+            <span>v2.1 · Tauri v2 · React 18</span>
           </div>
         </div>
         <div className="banner-right">
@@ -61,8 +83,8 @@ export default function HomePage({ policyCount, carrierCount }: Props) {
             <div className="stat-label">物业载体</div>
           </div>
           <div className="stat-card">
-            <div className="stat-num">2</div>
-            <div className="stat-label">已上线模块</div>
+            <div className="stat-num">{news.length || 0}</div>
+            <div className="stat-label">产业快讯</div>
           </div>
           <div className="stat-card">
             <div className="stat-num">2</div>
@@ -73,16 +95,7 @@ export default function HomePage({ policyCount, carrierCount }: Props) {
 
       {/* 模块卡片区 */}
       <div className="home-modules">
-        {/* 左侧：政策滚动占位 */}
-        <div className="module-placeholder-panel">
-          <div className="placeholder-panel-icon">📜</div>
-          <div className="placeholder-panel-title">政策速递</div>
-          <div className="placeholder-panel-desc">实时政策滚动播报</div>
-          <div className="placeholder-panel-tag">开发中</div>
-        </div>
-
-        {/* 右侧：四个模块卡片 */}
-        <div className="module-grid">
+        {/* 四个模块卡片 */}
         <div className="module-card module-active" onClick={() => (window as any).__setPage__?.("policy")}>
           <div className="module-icon">📋</div>
           <div className="module-info">
@@ -142,7 +155,6 @@ export default function HomePage({ policyCount, carrierCount }: Props) {
           </div>
           <div className="module-enter placeholder">敬请期待</div>
         </div>
-      </div>
       </div>
 
       {/* 平台介绍 */}
