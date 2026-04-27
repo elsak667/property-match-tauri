@@ -11,14 +11,15 @@ import json
 
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    for p in ["../.env", ".env"]:
+        load_dotenv(p, override=True)
 except ImportError:
     pass
 
-FEISHU_APP_ID = os.getenv("FEISHU_APP_ID", "cli_a950307a10b8dcb1")
-FEISHU_APP_SECRET = os.getenv("FEISHU_APP_SECRET", "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj")
-NEWS_SHEET_TOKEN = "JtEFsWqVRhPyPetC7Jyc19Oongt"
-NEWS_SHEET_ID = "b6daf2"  # 第一个 Sheet tab 的 ID
+FEISHU_APP_ID = os.environ["FEISHU_APP_ID"]
+FEISHU_APP_SECRET = os.environ["FEISHU_APP_SECRET"]
+NEWS_SHEET_TOKEN = os.environ["NEWS_SHEET_TOKEN"]
+NEWS_SHEET_ID = os.environ["NEWS_SHEET_ID"]
 TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
 SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets"
 
@@ -72,7 +73,8 @@ def fetch_news(limit=50):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto("https://www.zhangtongshe.com/news", wait_until="networkidle", timeout=30000)
-        text = page.inner_text("body")
+        # 只取新闻内容区，不含页眉/页脚/侧边栏
+        text = page.inner_text("main.main-content > div.news-page")
         browser.close()
     return parse_news(text, limit)
 
@@ -87,7 +89,7 @@ def parse_news(html: str, limit: int):
     """
     date_pat = re.compile(r"(\d{4})年(\d{2})月(\d{2})日")
     time_pat = re.compile(r"^(\d{2}):(\d{2})$")
-    title_pat = re.compile(r"^(IPO|投融资|人事|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|人事|其他动态)\s*\|\s*(.+)$")
+    title_pat = re.compile(r"^(IPO|投融资|人事|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|其他动态)\s*\|\s*(.+)$")
 
     lines = html.split("\n")
     items = []
@@ -153,9 +155,22 @@ def main():
     parser = argparse.ArgumentParser(description="张通社新闻抓取 → 飞书表格")
     parser.add_argument("--dry-run", action="store_true", help="只打印不写入")
     parser.add_argument("--limit", type=int, default=50, help="最多抓取条数")
+    parser.add_argument("--force", action="store_true", help="强制重写全部数据（忽略已存在判断）")
     args = parser.parse_args()
 
     token = get_token()
+
+    if args.force:
+        news_items = fetch_news(args.limit)
+        print(f"抓取到 {len(news_items)} 条")
+        rows = [[n["time"], n["category"], n["title"], n["link"], n["summary"]] for n in news_items]
+        success = append_rows(token, rows)
+        if success:
+            print(f"✅ 成功写入 {len(news_items)} 条到飞书表格")
+        else:
+            print("❌ 写入飞书失败")
+            sys.exit(1)
+        return
 
     existing = read_sheet(token)
     existing_titles = {row[2].strip() for row in existing if len(row) >= 3 and row[2]}

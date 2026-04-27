@@ -1,5 +1,6 @@
 /**
  * 飞书 API 集成 — Rust 后端
+ * 凭证从 .env 文件读取，请复制 .env.example 为 .env 后填入真实值
  */
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,13 +10,28 @@ use tauri::State;
 const TOKEN_URL: &str = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
 const SHEET_VALUES_URL: &str = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
 
-// ── Spreadsheet 配置 ────────────────────────────────────────────────────────────
-const PROPERTY_SHEET: &str = "X1jRs1PhLhR8WetSwktcM9Fgnhg";
-const PROPERTY_BUILDING_SHEET_ID: &str = "4hdJSh"; // 楼宇
-
-pub const POLICY_SHEET: &str = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-pub const POLICY_SHEET_ID: &str = "0aad30";
-pub const STATS_SHEET_ID: &str = "2pLPm8";
+// ── Spreadsheet 配置（从环境变量读取）────────────────────────────────────────
+fn get_property_sheet() -> String {
+    std::env::var("PROPERTY_SHEET").unwrap_or_else(|_| "X1jRs1PhLhR8WetSwktcM9Fgnhg".to_string())
+}
+fn get_property_building_sheet_id() -> String {
+    std::env::var("PROPERTY_BUILDING_SHEET_ID").unwrap_or_else(|_| "4hdJSh".to_string())
+}
+pub fn get_policy_sheet() -> String {
+    std::env::var("POLICY_SHEET").unwrap_or_else(|_| "DwqqsS6TShlGhAteDf3cHRwvnHe".to_string())
+}
+pub fn get_policy_sheet_id() -> String {
+    std::env::var("POLICY_SHEET_ID").unwrap_or_else(|_| "0aad30".to_string())
+}
+pub fn get_stats_sheet_id() -> String {
+    std::env::var("STATS_SHEET_ID").unwrap_or_else(|_| "2pLPm8".to_string())
+}
+pub fn get_news_sheet() -> String {
+    std::env::var("NEWS_SHEET_TOKEN").unwrap_or_else(|_| "JtEFsWqVRhPyPetC7Jyc19Oongt".to_string())
+}
+pub fn get_news_sheet_id() -> String {
+    std::env::var("NEWS_SHEET_ID").unwrap_or_else(|_| "b6daf2".to_string())
+}
 
 // ── 数据结构 ──────────────────────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize)]
@@ -65,13 +81,11 @@ impl Default for TokenCache {
 pub type AppState = Mutex<TokenCache>;
 
 pub fn get_app_id() -> String {
-    std::env::var("FEISHU_APP_ID").ok().filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "cli_a950307a10b8dcb1".to_string())
+    std::env::var("FEISHU_APP_ID").expect("FEISHU_APP_ID not set in .env")
 }
 
 pub fn get_app_secret() -> String {
-    std::env::var("FEISHU_APP_SECRET").ok().filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj".to_string())
+    std::env::var("FEISHU_APP_SECRET").expect("FEISHU_APP_SECRET not set in .env")
 }
 
 async fn fetch_new_token(app_id: &str, app_secret: &str) -> Result<String, String> {
@@ -85,7 +99,7 @@ async fn fetch_new_token(app_id: &str, app_secret: &str) -> Result<String, Strin
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
-        .danger_accept_invalid_certs(true) // 跳过证书验证测试
+        .danger_accept_invalid_certs(cfg!(debug_assertions))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -176,10 +190,6 @@ pub async fn get_valid_token(
     Ok(new_token)
 }
 
-// ── 新闻配置 ────────────────────────────────────────────────────────────────────
-pub const NEWS_SHEET: &str = "JtEFsWqVRhPyPetC7Jyc19Oongt";
-pub const NEWS_SHEET_ID: &str = "b6daf2";
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewsItem {
     pub time: String,
@@ -214,7 +224,7 @@ pub async fn feishu_fetch_news(
         }
     };
 
-    let rows = match fetch_sheet_values(NEWS_SHEET, NEWS_SHEET_ID, "A1:E100", &token).await {
+    let rows = match fetch_sheet_values(&get_news_sheet(), &get_news_sheet_id(), "A1:E100", &token).await {
         Ok(r) => r,
         Err(e) => {
             println!("[FEISHU] news sheet failed: {}, trying local cache", e);
@@ -275,7 +285,7 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
         Ok(token) => {
             result.insert("status".to_string(), "token_ok".to_string());
             result.insert("token_prefix".to_string(), format!("{}...", &token[..20.min(token.len())]));
-            match fetch_sheet_values(PROPERTY_SHEET, PROPERTY_BUILDING_SHEET_ID, "A1:S5", &token).await {
+            match fetch_sheet_values(&get_property_sheet(), &get_property_building_sheet_id(), "A1:S5", &token).await {
                 Ok(rows) => {
                     let data_rows = if rows.len() > 2 { &rows[2..] } else { &[] };
                     result.insert("property_rows".to_string(), data_rows.len().to_string());
@@ -286,7 +296,7 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
                     result.insert("property_error".to_string(), e);
                 }
             }
-            match fetch_sheet_values(POLICY_SHEET, STATS_SHEET_ID, "A1:U10", &token).await {
+            match fetch_sheet_values(&get_policy_sheet(), &get_stats_sheet_id(), "A1:U10", &token).await {
                 Ok(rows) => {
                     result.insert("policy_rows".to_string(), rows.len().to_string());
                     result.insert("policy_sample".to_string(),
@@ -309,8 +319,8 @@ pub async fn feishu_debug() -> Result<HashMap<String, String>, String> {
 pub async fn feishu_config() -> Result<HashMap<String, String>, String> {
     let mut cfg = HashMap::new();
     cfg.insert("has_app_id".to_string(), (!get_app_id().is_empty()).to_string());
-    cfg.insert("property_sheet".to_string(), PROPERTY_SHEET.to_string());
-    cfg.insert("policy_sheet".to_string(), POLICY_SHEET.to_string());
+    cfg.insert("property_sheet".to_string(), get_property_sheet());
+    cfg.insert("policy_sheet".to_string(), get_policy_sheet());
     cfg.insert("has_credentials".to_string(),
         (!get_app_id().is_empty() && !get_app_secret().is_empty()).to_string()
     );
@@ -337,7 +347,7 @@ pub async fn feishu_fetch_policies(
         }
     };
 
-    let rows = match fetch_sheet_values(POLICY_SHEET, POLICY_SHEET_ID, "A1:U600", &token).await {
+    let rows = match fetch_sheet_values(&get_policy_sheet(), &get_policy_sheet_id(), "A1:U600", &token).await {
         Ok(r) => r,
         Err(e) => {
             println!("[FEISHU] sheet read failed: {}, trying local cache", e);
