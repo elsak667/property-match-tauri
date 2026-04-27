@@ -31,22 +31,35 @@ function getColor(cat: string): string {
   return CATEGORY_COLORS[cat] || "#7f8c8d";
 }
 
+function parseDate(timeStr: string): Date {
+  const [month, day] = timeStr.split(" ")[0].split("/");
+  return new Date(2026, parseInt(month) - 1, parseInt(day));
+}
+
 export default function NewsTicker({ news }: Props) {
   const [paused, setPaused] = useState(false);
 
-  if (news.length === 0) {
+  // 近一周过滤
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  const recent = news.filter((n) => {
+    const d = parseDate(n.time);
+    return d >= cutoff;
+  });
+
+  if (recent.length === 0) {
     return (
       <div className="news-ticker">
         <div className="news-ticker-header">
           <span>📰</span>
           <span className="news-ticker-label">产业快讯</span>
         </div>
-        <span className="news-ticker-empty-text">暂无快讯内容</span>
+        <span className="news-ticker-empty-text">近一周暂无快讯</span>
       </div>
     );
   }
 
-  const items = [...news, ...news];
+  const items = [...recent, ...recent];
 
   return (
     <div
@@ -69,12 +82,14 @@ export default function NewsTicker({ news }: Props) {
               title={item.summary || item.title}
             >
               <div className="news-ticker-meta">
-                <span className="news-ticker-time">{item.time}</span>
                 <span
                   className="news-ticker-cat"
                   style={{ background: getColor(item.category) }}
                 >
                   {item.category}
+                </span>
+                <span className="news-ticker-time">
+                  {item.time.split(" ")[0]}
                 </span>
               </div>
               <span className="news-ticker-title">{item.title}</span>

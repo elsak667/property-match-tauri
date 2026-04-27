@@ -2,6 +2,7 @@
  * 浦东政策匹配算法库
  * 从 Python Flask app (v1.2) 移植
  */
+import { feishuCacheRead, feishuCacheWrite } from "./tauri";
 
 // Try Tauri HTTP plugin first, fall back to native fetch
 
@@ -1009,14 +1010,25 @@ export async function loadPropertyData(): Promise<{ parks: Park[]; buildings: Bu
         getSheetAsObjects<Building>("楼宇", 3),
         getSheetAsObjects<Unit>("单元", 3),
       ]);
+      const result = { parks, buildings, units };
+      // 写入本地缓存
+      feishuCacheWrite("property_data_v2", result as unknown as Record<string, unknown>).catch(() => {});
+      return result;
     } catch (e) {
       if (e instanceof FeishuCredentialsMissing) {
-        console.warn("[loadPropertyData] Feishu credentials missing, returning empty data");
-        return { parks: [], buildings: [], units: [] };
+        console.warn("[loadPropertyData] Feishu credentials missing, trying local cache...");
       }
-      throw e;
+      // 飞书失败：读本地缓存
+      try {
+        const cached = await feishuCacheRead("property_data_v2") as { parks: Park[]; buildings: Building[]; units: Unit[] } | null;
+        if (cached && (cached.parks?.length > 0 || cached.buildings?.length > 0 || cached.units?.length > 0)) {
+          console.log(`[loadPropertyData] Loaded ${cached.units?.length ?? 0} units from local cache`);
+          return cached;
+        }
+      } catch {}
+      console.warn("[loadPropertyData] No local cache, returning empty data");
+      return { parks: [], buildings: [], units: [] };
     }
-    return { parks, buildings, units };
   });
 }
 

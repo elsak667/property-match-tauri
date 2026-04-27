@@ -126,6 +126,8 @@ fn main() {
             feishu::feishu_fetch_news,
             feishu::feishu_token,
             feishu::feishu_sheet,
+            feishu::feishu_cache_read,
+            feishu::feishu_cache_write,
             open_in_browser,
             write_temp_file,
             get_policy_stats,

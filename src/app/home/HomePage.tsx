@@ -215,14 +215,14 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
       {/* 更新日志 */}
       <div className="home-section">
         <h2 className="section-title">更新日志</h2>
-        <div className="changelog-list">
+        <div className="changelog-timeline">
+          <div className="timeline-line" />
           {CHANGELOG.map((entry) => (
-            <div key={entry.version} className="changelog-item">
-              <div className="changelog-header">
-                <span className="changelog-version">{entry.version}</span>
-                <span className="changelog-date">{entry.date}</span>
-              </div>
-              <ul className="changelog-changes">
+            <div key={entry.version} className="timeline-item">
+              <div className="timeline-dot" />
+              <div className="timeline-version">{entry.version}</div>
+              <div className="timeline-date">{entry.date}</div>
+              <ul className="timeline-changes">
                 {entry.changes.map((c, i) => (
                   <li key={i}>{c}</li>
                 ))}
