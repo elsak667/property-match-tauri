@@ -177,7 +177,8 @@ pub async fn get_valid_token(
 }
 
 // ── 新闻配置 ────────────────────────────────────────────────────────────────────
-pub const NEWS_SHEET: &str = "OWV2sO5l9h6qWFtZKfic34k9nFg";
+pub const NEWS_SHEET: &str = "JtEFsWqVRhPyPetC7Jyc19Oongt";
+pub const NEWS_SHEET_ID: &str = "b6daf2";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewsItem {
@@ -199,7 +200,7 @@ pub async fn feishu_fetch_news(
 
     let token = get_valid_token(&state, &app_id, &app_secret).await?;
 
-    let rows = fetch_sheet_values(NEWS_SHEET, "0", "A1:E100", &token).await?;
+    let rows = fetch_sheet_values(NEWS_SHEET, NEWS_SHEET_ID, "A1:E100", &token).await?;
 
     if rows.len() < 2 {
         return Ok(vec![]);
