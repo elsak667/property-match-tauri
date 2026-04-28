@@ -1,10 +1,10 @@
 /**
- * Workers API 调用层 — 前端直接调 /api/*
- * 构建时通过 Vite proxy 代理到 http://127.0.0.1:8787（dev）
- * 或 Cloudflare Workers 部署地址（prod）
+ * Workers API 调用层
+ * 开发时：Vite proxy 代理到 localhost:8787（本地 wrangler dev）
+ * 生产时：直接请求 Cloudflare Workers
  */
 
-const BASE = "/api";
+const BASE = "https://pudong-invest-platform.kokosspig.workers.dev/api";
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
