@@ -1,0 +1,12 @@
+name = "pudong-invest-platform"
+main = "src/index.ts"
+compatibility_date = "2025-01-09"
+
+[vars]
+PROPERTY_SHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg"
+PROPERTY_BUILDING_SHEET_ID = "4hdJSh"
+POLICY_SHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe"
+POLICY_SHEET_ID = "0aad30"
+STATS_SHEET_ID = "2pLPm8"
+NEWS_SHEET = "JtEFsWqVRhPyPetC7Jyc19Oongt"
+NEWS_SHEET_ID = "b6daf2"
