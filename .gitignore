@@ -16,6 +16,10 @@ dist-ssr
 .env
 src-tauri/.env
 
+# Workers
+workers/.dev.vars
+workers/.wrangler/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
