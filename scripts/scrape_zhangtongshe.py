@@ -8,6 +8,7 @@ import sys
 import argparse
 import re
 import json
+import unicodedata
 
 try:
     from dotenv import load_dotenv
@@ -24,6 +25,10 @@ TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/intern
 SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets"
 
 import urllib.request
+
+def normalize_title(title: str) -> str:
+    """Normalize Chinese/smart quotes to ASCII double quotes for consistent dedup."""
+    return title.replace('“', '"').replace('”', '"').replace('「', '"').replace('」', '"')
 
 def get_token():
     payload = json.dumps({"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}).encode()
@@ -44,12 +49,13 @@ def read_sheet(token, range_str="A2:E200"):
         raise Exception(f"Sheet read error {data.get('code')}: {data.get('msg')}")
     return data.get("data", {}).get("valueRange", {}).get("values", [])
 
-def append_rows(token, rows):
+def append_rows(token, rows, start_row=2):
+    """Append rows starting at start_row (1-indexed, sheet row)."""
     url = f"{SHEET_URL}/{NEWS_SHEET_TOKEN}/values"
     col_letter = chr(65 + len(rows[0]) - 1)
     payload = {
         "valueRange": {
-            "range": f"{NEWS_SHEET_ID}!A2:{col_letter}{1 + len(rows)}",
+            "range": f"{NEWS_SHEET_ID}!A{start_row}:{col_letter}{start_row - 1 + len(rows)}",
             "values": rows
         }
     }
@@ -143,7 +149,7 @@ def parse_news(html: str, limit: int):
             items.append({
                 "time": f"{current_date} {time_str}",
                 "category": category or "其他动态",
-                "title": title[:200],
+                "title": normalize_title(title[:200]),
                 "link": "",
                 "summary": " ".join(summary_parts)[:500],
             })
@@ -173,7 +179,7 @@ def main():
         return
 
     existing = read_sheet(token)
-    existing_titles = {row[2].strip() for row in existing if len(row) >= 3 and row[2]}
+    existing_titles = {normalize_title(row[2].strip()) for row in existing if len(row) >= 3 and row[2]}
     print(f"已有 {len(existing_titles)} 条记录")
 
     news_items = fetch_news(args.limit)
@@ -192,8 +198,10 @@ def main():
             print(f"  [{item['time']}] [{item['category']}] {item['title']}")
         return
 
+    # Compute next empty row: existing data + header row (row 1) + 1-based index
+    next_row = len(existing_titles) + 2
     rows = [[n["time"], n["category"], n["title"], n["link"], n["summary"]] for n in new_items]
-    success = append_rows(token, rows)
+    success = append_rows(token, rows, start_row=next_row)
     if success:
         print(f"\n✅ 成功写入 {len(new_items)} 条到飞书表格")
     else:
