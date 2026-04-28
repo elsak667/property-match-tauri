@@ -3,6 +3,7 @@
  * 从 Python Flask app (v1.2) 移植
  */
 import { feishuCacheRead, feishuCacheWrite } from "./tauri";
+import { fetchPropertySheet } from "./workers";
 
 // Try Tauri HTTP plugin first, fall back to native fetch
 
@@ -667,6 +668,14 @@ async function getSheetData(sheetToken: string, sheetId: string, range?: string)
 }
 
 export async function getPolicySheetRows(): Promise<unknown[][]> {
+  if (import.meta.env.VITE_USE_WORKERS) {
+    const { fetchPoliciesFromWorkers } = await import("./workers");
+    const result = await fetchPoliciesFromWorkers();
+    // Transform SheetData back to unknown[][] format for loadPolicies()
+    return [result.headers, ...result.data.map(row =>
+      result.headers.map(h => row[h] ?? null)
+    )];
+  }
   return getSheetData(POLICY_SPREADSHEET, POLICY_SHEET_ID, "A1:U600");
 }
 
@@ -850,6 +859,17 @@ async function cacheOrRefresh<T>(key: string, fetcher: () => Promise<T>): Promis
 }
 
 async function getSheetAsObjects<T = Record<string, unknown>>(sheetName: string, startRow = 3): Promise<T[]> {
+  // Workers 模式下直接调 Workers API
+  if (import.meta.env.VITE_USE_WORKERS) {
+    try {
+      return await fetchPropertySheet(sheetName) as T[];
+    } catch (e) {
+      console.warn(`[getSheetAsObjects] Workers failed for ${sheetName}:`, e);
+      return [];
+    }
+  }
+
+  // Tauri 模式：原有逻辑
   const sheetId = PROPERTY_SHEET_IDS[sheetName];
   if (!sheetId) throw new Error(`Sheet "${sheetName}" not found`);
 
@@ -1011,21 +1031,33 @@ export async function loadPropertyData(): Promise<{ parks: Park[]; buildings: Bu
         getSheetAsObjects<Unit>("单元", 3),
       ]);
       const result = { parks, buildings, units };
-      // 写入本地缓存
-      feishuCacheWrite("property_data_v2", result as unknown as Record<string, unknown>).catch(() => {});
+      // Workers 模式下用 localStorage，Tauri 模式用 feishuCacheWrite
+      if (import.meta.env.VITE_USE_WORKERS) {
+        setCache("property_data_v2", result);
+      } else {
+        feishuCacheWrite("property_data_v2", result as unknown as Record<string, unknown>).catch(() => {});
+      }
       return result;
     } catch (e) {
       if (e instanceof FeishuCredentialsMissing) {
         console.warn("[loadPropertyData] Feishu credentials missing, trying local cache...");
       }
-      // 飞书失败：读本地缓存
-      try {
-        const cached = await feishuCacheRead("property_data_v2") as { parks: Park[]; buildings: Building[]; units: Unit[] } | null;
-        if (cached && (cached.parks?.length > 0 || cached.buildings?.length > 0 || cached.units?.length > 0)) {
-          console.log(`[loadPropertyData] Loaded ${cached.units?.length ?? 0} units from local cache`);
-          return cached;
-        }
-      } catch {}
+      // 优先读浏览器 localStorage 缓存
+      const cached = getCached<{ parks: Park[]; buildings: Building[]; units: Unit[] }>("property_data_v2");
+      if (cached && (cached.parks?.length > 0 || cached.buildings?.length > 0 || cached.units?.length > 0)) {
+        console.log(`[loadPropertyData] Loaded ${cached.units?.length ?? 0} units from local cache`);
+        return cached;
+      }
+      // Tauri 模式：尝试读 Tauri 文件缓存
+      if (!import.meta.env.VITE_USE_WORKERS) {
+        try {
+          const tauriCached = await feishuCacheRead("property_data_v2") as { parks: Park[]; buildings: Building[]; units: Unit[] } | null;
+          if (tauriCached && (tauriCached.parks?.length > 0 || tauriCached.buildings?.length > 0 || tauriCached.units?.length > 0)) {
+            console.log(`[loadPropertyData] Loaded ${tauriCached.units?.length ?? 0} units from Tauri cache`);
+            return tauriCached;
+          }
+        } catch {}
+      }
       console.warn("[loadPropertyData] No local cache, returning empty data");
       return { parks: [], buildings: [], units: [] };
     }

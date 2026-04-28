@@ -1,14 +1,14 @@
 /**
- * 飞书数据 Hook — 优先飞书 API，失配时降级到 Mock
+ * 飞书数据 Hook — 优先 Workers API，失配时降级到 Mock
  */
 import { useState, useEffect, useCallback } from "react";
 import {
-  getFeishuConfig,
-  fetchPoliciesFromFeishu,
-  fetchNewsFromFeishu,
+  getWorkersConfig as getFeishuConfig,
+  fetchPoliciesFromWorkers as fetchPoliciesFromFeishu,
+  fetchNewsFromWorkers as fetchNewsFromFeishu,
   type SheetData,
   type NewsItem,
-} from "./tauri";
+} from "./workers";
 import { loadPropertyData } from "./policy";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
 import type { FilterOptions, PolicyResult } from "../app/policy/types";
@@ -164,7 +164,7 @@ export function usePolicies() {
     setLoading(true);
     try {
       const cfg = await getFeishuConfig();
-      if (cfg.has_credentials === "true") {
+      if (cfg.has_credentials) {
         const raw = await fetchPoliciesFromFeishu();
         if (raw.data.length > 0) {
           const normalized = normalizePolicies(raw);
@@ -219,7 +219,7 @@ export function useNews() {
     setLoading(true);
     try {
       const cfg = await getFeishuConfig();
-      if (cfg.has_credentials === "true") {
+      if (cfg.has_credentials) {
         const items = await fetchNewsFromFeishu();
         setNews(items);
       }

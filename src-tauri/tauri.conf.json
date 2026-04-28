@@ -29,7 +29,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": [],
+    "targets": ["nsis"],
+    "shortDescription": "浦发集团招商平台",
+    "longDescription": "浦发集团招商平台 - 企业信息展示与政策匹配工具",
+    "copyright": "Copyright (c) 2026 浦发集团",
     "resources": ["resources/WebView2Loader.dll"],
     "icon": [
       "icons/32x32.png",
