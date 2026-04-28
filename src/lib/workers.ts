@@ -4,7 +4,7 @@
  * 生产时：直接请求 Cloudflare Workers
  */
 
-const BASE = "https://pudong-invest-platform.kokosspig.workers.dev/api";
+const BASE = "https://elsak.eu.org/api";
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
