@@ -150,13 +150,43 @@ window.addEventListener('load', () => { setTimeout(() => { window.print(); }, 60
 </body>
 </html>`;
 
-  // 将 HTML 内容写入临时文件，由 Rust 处理
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(html);
-  const data: number[] = Array.from(bytes);
-  const tmpFilename = `policy_print_${Date.now()}.html`;
-  const path = await invoke<string>("write_temp_file", { data, filename: tmpFilename });
-  await openInBrowser("file://" + path);
+  // 检测是否在 Tauri 环境（网页版直接用 window.open，桌面版用 Tauri）
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  if (isTauri) {
+    const encoder = new TextEncoder();
+    const data: number[] = Array.from(encoder.encode(html));
+    const tmpFilename = `policy_print_${Date.now()}.html`;
+    const path = await invoke<string>("write_temp_file", { data, filename: tmpFilename });
+    await openInBrowser("file://" + path);
+  } else {
+    // 网页版：直接用 data URL 打开新窗口
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "width=900,height=700,scrollbars=yes");
+    if (win) {
+      // 窗口关闭后释放 URL
+      win.addEventListener("unload", () => URL.revokeObjectURL(url));
+    }
+  }
+}
+
+/** 用浏览器打印任意 HTML 内容 */
+export async function openPrintHtmlRaw(html: string): Promise<void> {
+  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+  if (isTauri) {
+    const encoder = new TextEncoder();
+    const data: number[] = Array.from(encoder.encode(html));
+    const tmpFilename = `print_${Date.now()}.html`;
+    const path = await invoke<string>("write_temp_file", { data, filename: tmpFilename });
+    await openInBrowser("file://" + path);
+  } else {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "width=900,height=700,scrollbars=yes");
+    if (win) {
+      win.addEventListener("unload", () => URL.revokeObjectURL(url));
+    }
+  }
 }
 
 /** jsPDF 字节生成（保留备用，文件较大） */
