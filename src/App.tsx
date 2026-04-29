@@ -26,27 +26,30 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#e8eef5" }}>
-      <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-      <div className="container">
-        {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
-        {currentPage === "policy" && <PolicyPage />}
-        {currentPage === "property" && <CarrierPage />}
-        {currentPage === "placeholder-invest" && (
-          <PlaceholderPage
-            title="招商管理"
-            description="客户跟进记录、企业档案管理、招商进度追踪等功能模块正在规划与开发中。"
-            features={["客户信息管理", "招商进度追踪", "企业档案库", "拜访记录", "数据分析报表"]}
-          />
-        )}
-        {currentPage === "placeholder-industry" && (
-          <PlaceholderPage
-            title="产业图谱"
-            description="浦东新区产业赛道分析、重点行业分布、产业集群可视化等功能模块正在规划与开发中。"
-            features={["产业赛道分析", "重点行业分布", "产业集群可视化", "招商热力图", "行业趋势监测"]}
-          />
-        )}
+    <div className="app-wrapper">
+      <div className="app-main">
+        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+        <div className="container">
+          {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
+          {currentPage === "policy" && <PolicyPage />}
+          {currentPage === "property" && <CarrierPage />}
+          {currentPage === "placeholder-invest" && (
+            <PlaceholderPage
+              title="招商管理"
+              description="客户跟进记录、企业档案管理、招商进度追踪等功能模块正在规划与开发中。"
+              features={["客户信息管理", "招商进度追踪", "企业档案库", "拜访记录", "数据分析报表"]}
+            />
+          )}
+          {currentPage === "placeholder-industry" && (
+            <PlaceholderPage
+              title="产业图谱"
+              description="浦东新区产业赛道分析、重点行业分布、产业集群可视化等功能模块正在规划与开发中。"
+              features={["产业赛道分析", "重点行业分布", "产业集群可视化", "招商热力图", "行业趋势监测"]}
+            />
+          )}
+        </div>
       </div>
+      <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
     </div>
   );
 }
@@ -77,7 +80,7 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
             key={item.key}
             role="tab"
             aria-selected={currentPage === item.key}
-            className={`navbar-tab${currentPage === item.key ? " active" : ""}`}
+            className={"navbar-tab" + (currentPage === item.key ? " active" : "")}
             onClick={() => onNavigate(item.key)}
           >
             <span className="tab-icon">{item.icon}</span>
@@ -89,5 +92,23 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
         <span className="navbar-badge">🚫 内部使用</span>
       </div>
     </div>
+  );
+}
+
+function MobileTabBar({ currentPage, onNavigate }: NavBarProps) {
+  return (
+    <nav className="mobile-tabbar" aria-label="移动端导航">
+      {NAV_ITEMS.map(item => (
+        <button
+          key={item.key}
+          className={"mobile-tab" + (currentPage === item.key ? " active" : "")}
+          onClick={() => onNavigate(item.key)}
+          aria-label={item.label}
+        >
+          <span className="mobile-tab-icon">{item.icon}</span>
+          <span className="mobile-tab-label">{item.label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
