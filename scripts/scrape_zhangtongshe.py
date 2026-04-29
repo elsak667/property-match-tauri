@@ -80,82 +80,78 @@ def fetch_news(limit=50):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto("https://www.zhangtongshe.com/news", wait_until="networkidle", timeout=30000)
-        # 只取新闻内容区，不含页眉/页脚/侧边栏
-        text = page.inner_text("main.main-content > div.news-page")
-        browser.close()
-    return parse_news(text, limit)
+        # 逐条提取：每个 .news-item 是一个完整条目
+        items = []
+        date_pat = re.compile(r"(\d{4})年(\d{2})月(\d{2})日")
+        time_pat = re.compile(r"^(\d{2}):(\d{2})$")
+        title_pat = re.compile(r"^(IPO|投融资|人事|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|其他动态)\s*\|\s*(.+)$")
 
-def parse_news(html: str, limit: int):
-    """解析张通社新闻。
-
-    页面结构（按顺序）：
-      日期行: "2026年04月27日，星期一"
-      时间行: "10:00"
-      标题行: "IPO | 上海新能源独角兽，拟赴港上市！"
-      摘要行: 多行摘要文字...
-    """
-    date_pat = re.compile(r"(\d{4})年(\d{2})月(\d{2})日")
-    time_pat = re.compile(r"^(\d{2}):(\d{2})$")
-    title_pat = re.compile(r"^(IPO|投融资|人事|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|其他动态)\s*\|\s*(.+)$")
-
-    lines = html.split("\n")
-    items = []
-    current_date = ""
-
-    i = 0
-    while i < len(lines) and len(items) < limit:
-        line = lines[i].strip()
-        if not line:
-            i += 1
-            continue
-
-        dm = date_pat.search(line)
-        if dm:
-            current_date = f"{dm.group(1)}/{dm.group(2)}/{dm.group(3)}"
-            i += 1
-            continue
-
-        tm = time_pat.match(line)
-        if tm and current_date:
-            time_str = f"{tm.group(1)}:{tm.group(2)}"
-            # 下一行是标题行
-            i += 1
-            if i >= len(lines):
+        # 用 locator 遍历所有新闻条目
+        news_items = page.locator("div.news-item, div.news-list-item, .article-item, [class*=news-item]").all()
+        for el in news_items:
+            if len(items) >= limit:
                 break
-            title_line = lines[i].strip()
-            m = title_pat.match(title_line)
-            if m:
-                category = m.group(1)
-                title = m.group(2).strip()
-            else:
-                # 没有 | 分隔，当作普通文本跳过
-                i += 1
+            try:
+                text = el.inner_text()
+                lines = text.strip().split("\n")
+            except Exception:
                 continue
 
-            # 收集摘要（下一行开始直到日期/时间/标题）
-            summary_parts = []
-            for j in range(i + 1, len(lines)):
-                sl = lines[j].strip()
-                if not sl:
+            current_date = ""
+            for line in lines:
+                line = line.strip()
+                if not line:
                     continue
-                if date_pat.search(sl) or time_pat.match(sl) or title_pat.match(sl):
-                    i = j - 1  # 回退一行，让外层处理这个时间戳
-                    break
-                summary_parts.append(sl)
-                if len(" ".join(summary_parts)) > 600:
-                    break
-            else:
-                i += 1
-
-            items.append({
-                "time": f"{current_date} {time_str}",
-                "category": category or "其他动态",
-                "title": normalize_title(title[:200]),
-                "link": "",
-                "summary": " ".join(summary_parts)[:500],
-            })
-        i += 1
-
+                dm = date_pat.search(line)
+                if dm:
+                    current_date = f"{dm.group(1)}/{dm.group(2)}/{dm.group(3)}"
+                    continue
+                tm = time_pat.match(line)
+                if tm and current_date:
+                    time_str = f"{tm.group(1)}:{tm.group(2)}"
+                    # 找标题
+                    idx = lines.index(line)
+                    if idx + 1 < len(lines):
+                        title_line = lines[idx + 1].strip()
+                        m = title_pat.match(title_line)
+                        if m:
+                            category = m.group(1)
+                            title = m.group(2).strip()
+                        else:
+                            continue
+                    else:
+                        continue
+                    # 摘要：从标题后一行开始，收集到下一个日期/时间/分类标题出现为止
+                    summary_parts = []
+                    for sl in lines[idx + 2:]:
+                        sl = sl.strip()
+                        if not sl:
+                            continue
+                        # 只在行首匹配日期（避免摘要里的"2026年"字样误触发）
+                        if date_pat.match(sl) or time_pat.match(sl) or title_pat.match(sl):
+                            break
+                        summary_parts.append(sl)
+                        if len(" ".join(summary_parts)) > 600:
+                            break
+                    # 尝试提取链接
+                    link = ""
+                    try:
+                        link_el = el.locator("a[href]")
+                        if link_el.count() > 0:
+                            link = link_el.first.get_attribute("href") or ""
+                            if link and not link.startswith("http"):
+                                link = "https://www.zhangtongshe.com" + link
+                    except Exception:
+                        pass
+                    items.append({
+                        "time": f"{current_date} {time_str}",
+                        "category": category or "其他动态",
+                        "title": normalize_title(title[:200]),
+                        "link": link,
+                        "summary": " ".join(summary_parts)[:500],
+                    })
+                    break  # 本条目已解析，跳到下一个
+        browser.close()
     return items
 
 def main():
