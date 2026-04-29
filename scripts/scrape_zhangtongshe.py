@@ -9,6 +9,7 @@ import argparse
 import re
 import json
 import unicodedata
+import datetime
 
 try:
     from dotenv import load_dotenv
@@ -110,7 +111,7 @@ def parse_news(html: str, limit: int):
 
         dm = date_pat.search(line)
         if dm:
-            current_date = f"{dm.group(2)}/{dm.group(3)}"
+            current_date = f"{dm.group(1)}/{dm.group(2)}/{dm.group(3)}"
             i += 1
             continue
 
@@ -191,6 +192,21 @@ def main():
     if not new_items:
         print("没有新增内容，退出")
         return
+
+    # 只保留最近7天的新闻
+    cutoff = datetime.date.today() - datetime.timedelta(days=7)
+    date_pat = re.compile(r"(\d{4})/(\d{2})/(\d{2})")
+    filtered = []
+    for n in new_items:
+        m = date_pat.match(n["time"].split(" ")[0])
+        if m:
+            item_date = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            if item_date >= cutoff:
+                filtered.append(n)
+    print(f"最近7天: {len(filtered)} 条（已过滤 {len(new_items) - len(filtered)} 条旧数据）")
+    new_items = filtered
+
+    if not new_items:
 
     if args.dry_run:
         print("\n=== 预览新增条目 ===")
