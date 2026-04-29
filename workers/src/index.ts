@@ -45,6 +45,7 @@ interface PolicySummary {
 interface PropertySummary {
   name: string;
   park: string;
+  district: string;
   area_total: string;
   area_vacant: string;
   price: string;
@@ -114,11 +115,12 @@ async function getFeishuData(env: Env): Promise<DataCache> {
   const now = Date.now();
   if (dataCache && dataCache.ts + CACHE_TTL > now) return dataCache;
 
-  // 并行拉取政策和物业
-  const [policyRows, unitRows, buildingRows] = await Promise.all([
+  // 并行拉取政策 + 物业（单元、楼宇、园区）
+  const [policyRows, unitRows, buildingRows, parkRows] = await Promise.all([
     fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:U600").catch(() => []),
     fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_UNIT_SHEET_ID || "4hdJSi", "A1:ZZ500").catch(() => []),
     fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_BUILDING_SHEET_ID || "4hdJSh", "A1:ZZ100").catch(() => []),
+    fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_PARK_SHEET_ID || "4hdJSg", "A1:ZZ100").catch(() => []),
   ]);
 
   // ── 政策摘要 ────────────────────────────────────────────────────────────────
@@ -134,6 +136,11 @@ async function getFeishuData(env: Env): Promise<DataCache> {
       const row = policyRows[r] as unknown[];
       if (!Array.isArray(row) || row.length === 0 || row[0] == null) continue;
       const name = str(row[iName]); if (!name) continue;
+      const end = str(row[iEnd]);
+      if (end) {
+        const endDate = new Date(end);
+        if (!isNaN(endDate.getTime()) && endDate < new Date()) continue;
+      }
       const amountRaw = str(row[iAmt]);
       let amount_s = amountRaw;
       if (amountRaw && !/万|亿|元/.test(amountRaw) && !isNaN(Number(amountRaw))) {
@@ -150,17 +157,37 @@ async function getFeishuData(env: Env): Promise<DataCache> {
     }
   }
 
-  // ── 物业摘要（单元 + 楼宇 join）───────────────────────────────────────────────
-  // 构建 building_id → building_name 映射
-  const buildingMap: Record<string, string> = {};
+  // ── 物业摘要（单元 + 楼宇 + 园区 join）────────────────────────────────────
+  // park_id → 园区名+区域
+  const parkMap: Record<string, string> = {};
+  const parkDistrictMap: Record<string, string> = {};
+  if (parkRows.length >= 3) {
+    const phdr = (parkRows[1] as unknown[]).map((v) => String(v ?? ""));
+    const piId = phdr.indexOf("park_id"); const piName = phdr.indexOf("name");
+    const piDist = phdr.indexOf("district");
+    for (let r = 2; r < parkRows.length; r++) {
+      const row = parkRows[r] as unknown[];
+      if (!Array.isArray(row) || !row[piId]) continue;
+      const pid = str(row[piId]); const pname = str(row[piName]); const pdist = str(row[piDist]);
+      if (pid) { parkMap[pid] = pname; parkDistrictMap[pid] = pdist; }
+    }
+  }
+
+  // building_id → {name, park_id, industry}
+  const buildingInfo: Record<string, {name: string; park_id: string; industry: string}> = {};
   if (buildingRows.length >= 3) {
     const bhdr = (buildingRows[1] as unknown[]).map((v) => String(v ?? ""));
     const biId = bhdr.indexOf("building_id"); const biName = bhdr.indexOf("name");
+    const biPark = bhdr.indexOf("park_id"); const biInd = bhdr.indexOf("industry");
     for (let r = 2; r < buildingRows.length; r++) {
       const row = buildingRows[r] as unknown[];
       if (!Array.isArray(row) || !row[biId]) continue;
-      const bid = str(row[biId]); const bname = str(row[biName]);
-      if (bid && bname) buildingMap[bid] = bname;
+      const bid = str(row[biId]);
+      if (bid) buildingInfo[bid] = {
+        name: str(row[biName]),
+        park_id: str(row[biPark]),
+        industry: str(row[biInd]),
+      };
     }
   }
 
@@ -177,13 +204,16 @@ async function getFeishuData(env: Env): Promise<DataCache> {
       if (!Array.isArray(row) || row.length === 0 || row[0] == null) continue;
       const name = str(row[iName]); if (!name) continue;
       const bid = str(row[iBid]);
-      const bname = buildingMap[bid] || "";
+      const bInfo = buildingInfo[bid] || {};
+      const pid = bInfo.park_id || "";
+      const pname = parkMap[pid] || bInfo.name || "";
+      const pdist = parkDistrictMap[pid] || "";
       properties.push({
-        name, park: bname,
+        name, park: pname, district: pdist,
         area_total: str(row[iArea]) || str(row[iVac]),
         area_vacant: str(row[iVac]),
         price: str(row[iPrice]),
-        industry: "",
+        industry: bInfo.industry || "",
         floor_height: str(row[iFH]),
         load: str(row[iLoad]),
         power_kv: str(row[iPwr]),
@@ -202,7 +232,7 @@ function buildContextSummary(data: DataCache): string {
   ).join("\n");
 
   const propLines = data.properties.map((p, i) =>
-    `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`
+    `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 区域:${p.district || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`
   ).join("\n");
 
   return `【政策库】（共 ${data.policies.length} 条）\n${polLines}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${propLines}`;
