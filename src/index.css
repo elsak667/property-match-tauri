@@ -2,6 +2,9 @@
 body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #e8eef5; color: #1c1c1e; min-height: 100vh; }
 .container { max-width: 1280px; margin: 0 auto; padding: 16px; }
 
+/* ─── Mobile Tab Bar (hidden by default, shown in mobile media query) ─── */
+.mobile-tabbar { display: none; }
+
 /* ─── Layout ─── */
 .main-layout { display: grid; grid-template-columns: 260px 1fr; gap: 14px; }
 
@@ -851,6 +854,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 
   /* ─── Mobile Tab Bar ─── */
   .mobile-tabbar {
+    display: flex;
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 999;
