@@ -634,102 +634,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 /* ══════════════════════════════════════════
    Mobile Responsive — 768px and below
    ══════════════════════════════════════════ */
-@media (max-width: 768px) {
-  /* ─── App wrapper ─── */
-  .app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
-  .app-main { flex: 1; padding-bottom: 70px; }
-
-  /* ─── NavBar: hide on mobile (use bottom tab bar) ─── */
-  .navbar { display: none; }
-
-  /* ─── Mobile Tab Bar ─── */
-  .mobile-tabbar {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 999;
-    background: rgba(255,255,255,.97);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(100,116,139,.15);
-    display: flex;
-    justify-content: space-around;
-    padding: 6px 0;
-    padding-bottom: max(6px, env(safe-area-inset-bottom));
-  }
-  .mobile-tab {
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    background: none; border: none; cursor: pointer; padding: 4px 8px;
-    border-radius: 8px; transition: background .2s;
-    min-width: 52px;
-  }
-  .mobile-tab:active { background: rgba(59,109,181,.1); }
-  .mobile-tab-icon { font-size: 22px; line-height: 1; }
-  .mobile-tab-label { font-size: 10px; color: #94a3b8; font-weight: 500; }
-  .mobile-tab.active .mobile-tab-label { color: #3b6db5; }
-  .mobile-tab.active .mobile-tab-icon { transform: scale(1.1); }
-
-  /* ─── Container ─── */
-  .container { padding: 10px 12px; }
-
-  /* ─── Banner ─── */
-  .home-banner {
-    flex-direction: column !important;
-    padding: 16px !important;
-  }
-  .banner-right {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
-  }
-  .stat-card { padding: 10px 8px !important; }
-  .stat-num { font-size: 20px !important; }
-  .stat-label { font-size: 11px !important; }
-
-  /* ─── Home Modules ─── */
-  .home-modules {
-    grid-template-columns: 1fr !important;
-    gap: 10px !important;
-  }
-  .module-grid { display: flex; flex-direction: column; gap: 10px; }
-
-  /* ─── News Ticker: horizontal scroll strip ─── */
-  .news-ticker { height: auto !important; }
-  .news-ticker-track-wrap { height: auto !important; overflow: visible !important; }
-  .news-ticker-track {
-    flex-direction: row !important;
-    animation: ticker-scroll-h 30s linear infinite;
-    gap: 0;
-  }
-  .news-ticker-item {
-    flex-shrink: 0;
-    width: 260px;
-    padding: 10px 12px !important;
-    border-bottom: none !important;
-    border-right: 1px solid #f1f5f9 !important;
-  }
-  @keyframes ticker-scroll-h {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-  }
-
-  /* ─── About Grid ─── */
-  .about-grid { grid-template-columns: 1fr !important; }
-
-  /* ─── Timeline ─── */
-  .changelog-timeline { padding-left: 8px !important; }
-  .timeline-line { display: none; }
-
-  /* ─── Policy Page ─── */
-  .main-layout {
-    grid-template-columns: 1fr !important;
-  }
-  .main-layout .sidebar {
-    max-height: none !important;
-    overflow-y: visible !important;
-    margin-bottom: 12px;
-  }
-  .filter-section { margin-bottom: 8px; }
-
-  /* ─── AI 智能助手 ─── */
+/* ─── AI 智能助手 ─── */
 .ai-card {
   background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
   border: 1px solid rgba(59, 109, 181, 0.18);
@@ -1029,16 +934,106 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   padding: 8px;
 }
 
-/* ─── Carrier Page ─── */
+@media (max-width: 768px) {
+  /* ─── App wrapper ─── */
+  .app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
+  .app-main { flex: 1; padding-bottom: 70px; }
+
+  /* ─── NavBar: hide on mobile (use bottom tab bar) ─── */
+  .navbar { display: none; }
+
+  /* ─── Mobile Tab Bar ─── */
+  .mobile-tabbar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 999;
+    background: rgba(255,255,255,.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(100,116,139,.15);
+    display: flex;
+    justify-content: space-around;
+    padding: 6px 0;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  .mobile-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; cursor: pointer; padding: 4px 8px;
+    border-radius: 8px; transition: background .2s;
+    min-width: 52px;
+  }
+  .mobile-tab:active { background: rgba(59,109,181,.1); }
+  .mobile-tab-icon { font-size: 22px; line-height: 1; }
+  .mobile-tab-label { font-size: 10px; color: #94a3b8; font-weight: 500; }
+  .mobile-tab.active .mobile-tab-label { color: #3b6db5; }
+  .mobile-tab.active .mobile-tab-icon { transform: scale(1.1); }
+
+  /* ─── Container ─── */
+  .container { padding: 10px 12px; }
+
+  /* ─── Banner ─── */
+  .home-banner {
+    flex-direction: column !important;
+    padding: 16px !important;
+  }
+  .banner-right {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .stat-card { padding: 10px 8px !important; }
+  .stat-num { font-size: 20px !important; }
+  .stat-label { font-size: 11px !important; }
+
+  /* ─── Home Modules ─── */
+  .home-modules {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .module-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ─── News Ticker: horizontal scroll strip ─── */
+  .news-ticker { height: auto !important; }
+  .news-ticker-track-wrap { height: auto !important; overflow: visible !important; }
+  .news-ticker-track {
+    flex-direction: row !important;
+    animation: ticker-scroll-h 30s linear infinite;
+    gap: 0;
+  }
+  .news-ticker-item {
+    flex-shrink: 0;
+    width: 260px;
+    padding: 10px 12px !important;
+    border-bottom: none !important;
+    border-right: 1px solid #f1f5f9 !important;
+  }
+  @keyframes ticker-scroll-h {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ─── About Grid ─── */
+  .about-grid { grid-template-columns: 1fr !important; }
+
+  /* ─── Timeline ─── */
+  .changelog-timeline { padding-left: 8px !important; }
+  .timeline-line { display: none; }
+
+  /* ─── Policy Page ─── */
+  .main-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .main-layout .sidebar {
+    max-height: none !important;
+    overflow-y: visible !important;
+    margin-bottom: 12px;
+  }
+  .filter-section { margin-bottom: 8px; }
+
+  /* ─── Carrier Page ─── */
 
   /* ─── Footer ─── */
   .footer-banner { padding: 12px !important; }
-}
-
-/* ══════════════════════════════════════════
-   Small Mobile — 480px and below
-   ══════════════════════════════════════════ */
-@media (max-width: 480px) {
+}@media (max-width: 480px) {
   .banner-title { font-size: 20px !important; }
   .banner-subtitle { font-size: 13px !important; }
   .banner-badge { font-size: 11px !important; }
