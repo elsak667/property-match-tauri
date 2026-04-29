@@ -2,6 +2,7 @@
  * 首页 — 平台介绍 + 模块入口
  */
 import NewsTicker from "../../components/NewsTicker";
+import AIAssistant from "../../components/AIAssistant";
 
 declare global {
   interface Window {
@@ -95,6 +96,9 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
           </div>
         </div>
       </div>
+
+      {/* AI 智能助手 */}
+      <AIAssistant />
 
       {/* 产业快讯 + 模块卡片 */}
       <div className="home-modules">
