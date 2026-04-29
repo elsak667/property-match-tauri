@@ -1,0 +1,33 @@
+name: Auto Tag on Main Push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto Tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          DATE=$(date +%Y-%m-%d)
+          PREFIX="v${DATE}"
+
+          # 找出当天已有的标签数量
+          EXISTING=$(git tag -l "${PREFIX}-*" 2>/dev/null | wc -l | tr -d ' ')
+          NEXT_NUM=$((EXISTING + 1))
+
+          TAG="${PREFIX}-${NEXT_NUM}"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          echo "✅ Tagged: $TAG"
