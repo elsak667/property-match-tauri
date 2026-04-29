@@ -1,7 +1,7 @@
 /**
- * AI 智能助手 — 自然语言筛选政策与载体
+ * AI 智能助手 — 浮窗气泡模式
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { openPrintHtmlRaw } from "../lib/pdfgen_new";
 
 interface AiFilters {
@@ -18,7 +18,6 @@ interface PolicyItem {
   subject?: string;
   cap?: string;
   end_date?: string;
-  days_left?: number;
   _reasons?: string[];
   expired?: boolean;
   stars?: number;
@@ -101,29 +100,32 @@ function matchScore(item: PolicyItem, filters: AiFilters): number {
   return score;
 }
 
-function Spinner() {
-  return (
-    <div className="ai-spinner">
-      <div className="ai-spinner-ring" />
-      <span>AI 分析中...</span>
-    </div>
-  );
-}
-
 export default function AIAssistant() {
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [policies, setPolicies] = useState<PolicyItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [filters, setFilters] = useState<AiFilters | null>(null);
-  const [done, setDone] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
     setLoading(true);
     setError("");
-    setDone(false);
     try {
       const f = await aiSearch(query.trim());
       setFilters(f);
@@ -139,7 +141,6 @@ export default function AIAssistant() {
       });
       setPolicies(pols);
       setProperties(props);
-      setDone(true);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
@@ -150,9 +151,7 @@ export default function AIAssistant() {
   const handleExport = () => {
     const policyRows = policies.map((p) => {
       const amount = p.amount_s
-        ? p.amount_s === "待定"
-          ? "待定"
-          : /万|元/.test(p.amount_s) ? p.amount_s : `${p.amount_s}万元`
+        ? p.amount_s === "待定" ? "待定" : /万|元/.test(p.amount_s) ? p.amount_s : `${p.amount_s}万元`
         : "—";
       const end = p.end_date ? p.end_date.substring(0, 10) : "长期有效";
       return `<tr>
@@ -171,196 +170,117 @@ export default function AIAssistant() {
       <td style="padding:8px;border:1px solid #ddd">${p.price || "—"}</td>
     </tr>`).join("");
 
-    const filterLine = filters ? Object.entries(filters).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(" | ") : "";
     const propTable = properties.length
-      ? `<h2 style="color:#3b6db5;margin-top:24px">物业载体（${properties.length} 条）</h2>
+      ? `<h2 style="color:#3b6db5;margin-top:20px">物业载体（${properties.length} 条）</h2>
   <table style="border-collapse:collapse;width:100%;font-size:13px">
-    <thead><tr style="background:#f0f4ff">
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">载体名称</th>
-      <th style="padding:8px;border:1px solid #ddd">园区</th>
-      <th style="padding:8px;border:1px solid #ddd">面积</th>
-      <th style="padding:8px;border:1px solid #ddd">价格</th>
-    </tr></thead><tbody>${propRows}</tbody></table>`
+    <thead><tr style="background:#f0f4ff"><th style="padding:8px;border:1px solid #ddd;text-align:left">名称</th><th style="padding:8px;border:1px solid #ddd">园区</th><th style="padding:8px;border:1px solid #ddd">面积</th><th style="padding:8px;border:1px solid #ddd">价格</th></tr></thead><tbody>${propRows}</tbody></table>`
       : "";
 
+    const filterLine = filters ? Object.entries(filters).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(" | ") : "";
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>AI匹配结果</title>
-<style>body{padding:24px;font-family:sans-serif}h2{color:#3b6db5;margin-top:20px}th{background:#f0f4ff}</style>
-</head><body>
-<h1 style="color:#3b6db5">AI 智能匹配结果</h1>
-<p><strong>查询：</strong>${query}</p>
+<style>body{padding:24px}h2{color:#3b6db5;margin-top:20px}th{background:#f0f4ff}</style></head><body>
+<h1 style="color:#3b6db5">AI 智能匹配结果</h1><p><strong>查询：</strong>${query}</p>
 ${filterLine ? `<p style="color:#888">解析条件：${filterLine}</p>` : ""}
 <h2>政策匹配（${policies.length} 条）</h2>
 <table style="border-collapse:collapse;width:100%;font-size:13px">
-  <thead><tr style="background:#f0f4ff">
-    <th style="padding:8px;border:1px solid #ddd;text-align:left">政策名称</th>
-    <th style="padding:8px;border:1px solid #ddd">补贴金额</th>
-    <th style="padding:8px;border:1px solid #ddd">行业</th>
-    <th style="padding:8px;border:1px solid #ddd">申报条件</th>
-    <th style="padding:8px;border:1px solid #ddd">截止日期</th>
-  </tr></thead><tbody>${policyRows}</tbody></table>
+  <thead><tr style="background:#f0f4ff"><th style="padding:8px;border:1px solid #ddd;text-align:left">政策名称</th><th style="padding:8px;border:1px solid #ddd">补贴</th><th style="padding:8px;border:1px solid #ddd">行业</th><th style="padding:8px;border:1px solid #ddd">条件</th><th style="padding:8px;border:1px solid #ddd">截止</th></tr></thead><tbody>${policyRows}</tbody></table>
 ${propTable}
-<p style="margin-top:24px;color:#999;font-size:12px">生成时间：${new Date().toLocaleString("zh-CN")} · 浦发集团招商平台</p>
+<p style="margin-top:20px;color:#999;font-size:12px">${new Date().toLocaleString("zh-CN")} · 浦发集团招商平台</p>
 </body></html>`;
     openPrintHtmlRaw(html);
   };
 
-  const activeFilters = filters ? Object.entries(filters).filter(([, v]) => v) : [];
-
   return (
-    <div className="ai-card">
-      {/* 搜索区域 */}
-      <div className="ai-search-wrap">
-        <div className="ai-icon-badge">🤖</div>
-        <h2 className="ai-heading">AI 智能匹配</h2>
-        <p className="ai-subheading">用自然语言描述您的招商需求，AI 自动解析并匹配政策与物业载体</p>
-        <div className="ai-search-box">
-          <input
-            className="ai-search-input"
-            type="text"
-            placeholder="例如：张江附近人工智能企业，补贴超过100万的政策"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            disabled={loading}
-          />
-          <button
-            className="ai-search-btn"
-            onClick={handleSearch}
-            disabled={loading || !query.trim()}
-          >
-            {loading ? (
-              <span className="ai-btn-spinner" />
-            ) : (
-              <span>搜索</span>
-            )}
-          </button>
-        </div>
-      </div>
+    <>
+      {/* 浮窗气泡按钮 */}
+      <button className="ai-fab" onClick={() => setOpen(!open)} aria-label="AI助手">
+        <span className="ai-fab-icon">{open ? "✕" : "🤖"}</span>
+        {policies.length > 0 && !open && <span className="ai-fab-dot" />}
+      </button>
 
-      {/* 加载状态 */}
-      {loading && <Spinner />}
-
-      {/* 错误提示 */}
-      {error && (
-        <div className="ai-msg ai-msg-error">
-          <span>⚠️ {error}</span>
-        </div>
-      )}
-
-      {/* 结果区域 */}
-      {done && (
-        <div className="ai-result-wrap">
-          {/* 统计栏 */}
-          <div className="ai-stat-bar">
-            <div className="ai-stat-item">
-              <div className="ai-stat-num">{policies.length}</div>
-              <div className="ai-stat-label">政策</div>
-            </div>
-            <div className="ai-stat-divider" />
-            <div className="ai-stat-item">
-              <div className="ai-stat-num">{properties.length}</div>
-              <div className="ai-stat-label">载体</div>
-            </div>
-            {activeFilters.length > 0 && (
-              <>
-                <div className="ai-stat-divider" />
-                <div className="ai-filter-chips">
-                  {activeFilters.map(([k, v]) => (
-                    <span key={k} className="ai-chip">{v}</span>
-                  ))}
-                </div>
-              </>
-            )}
-            {policies.length > 0 && (
-              <button className="ai-export-btn" onClick={handleExport}>
-                📄 导出 PDF
-              </button>
-            )}
+      {/* 浮窗面板 */}
+      {open && (
+        <div className="ai-panel" ref={panelRef}>
+          <div className="ai-panel-header">
+            <span>🤖</span>
+            <span className="ai-panel-title">AI 智能匹配</span>
+            <button className="ai-panel-close" onClick={() => setOpen(false)}>✕</button>
           </div>
 
-          {/* 无结果 */}
-          {policies.length === 0 && properties.length === 0 && (
-            <div className="ai-empty-state">
-              <div className="ai-empty-icon">🔍</div>
-              <div className="ai-empty-text">未找到匹配结果</div>
-              <div className="ai-empty-hint">试试换一种描述方式，或调整筛选条件</div>
-            </div>
-          )}
+          <div className="ai-panel-search">
+            <input
+              className="ai-panel-input"
+              type="text"
+              placeholder="描述您的需求，如：张江AI企业100万补贴"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              disabled={loading}
+            />
+            <button className="ai-panel-btn" onClick={handleSearch} disabled={loading || !query.trim()}>
+              {loading ? "..." : "🔍"}
+            </button>
+          </div>
 
-          {/* 政策列表 */}
-          {policies.length > 0 && (
-            <div className="ai-section">
-              <div className="ai-section-head">
-                <span className="ai-section-icon">📋</span>
-                <span className="ai-section-label">匹配政策</span>
-                <span className="ai-section-count">{policies.length} 条</span>
+          {error && <div className="ai-panel-error">⚠️ {error}</div>}
+
+          {(policies.length > 0 || properties.length > 0) && (
+            <div className="ai-panel-body">
+              <div className="ai-panel-summary">
+                <span>政策 <strong>{policies.length}</strong></span>
+                <span>载体 <strong>{properties.length}</strong></span>
+                {policies.length > 0 && (
+                  <button className="ai-panel-export" onClick={handleExport}>📄 PDF</button>
+                )}
               </div>
-              <div className="ai-list">
-                {policies.slice(0, 8).map((p, i) => (
-                  <div key={i} className={`ai-list-item${p.expired ? " expired" : ""}`}>
-                    <div className="ai-item-top">
-                      <div className="ai-item-title">
-                        {p.stars ? (
-                          <span className="ai-stars">{"★".repeat(p.stars)}</span>
-                        ) : null}
-                        {p.name || "—"}
+
+              {policies.slice(0, 5).map((p, i) => (
+                <div key={i} className={`ai-panel-item${p.expired ? " expired" : ""}`}>
+                  <div className="ai-panel-item-name">
+                    {p.stars ? <span className="ai-star">{"★".repeat(p.stars)}</span> : null}
+                    {p.name || "—"}
+                    {p.expired && <span className="ai-expired-tag">已过期</span>}
+                  </div>
+                  <div className="ai-panel-item-meta">
+                    {p.amount_s && <span>💰 {p.amount_s === "待定" ? "待定" : /万|元/.test(p.amount_s) ? p.amount_s : `${p.amount_s}万元`}</span>}
+                    {p.industry && <span>🏭 {p.industry}</span>}
+                    {p.end_date && <span>📅 {p.end_date.substring(0, 10)}</span>}
+                  </div>
+                  {p._reasons && p._reasons.length > 0 && (
+                    <div className="ai-panel-reason">{p._reasons.join(" · ")}</div>
+                  )}
+                </div>
+              ))}
+
+              {policies.length > 5 && (
+                <div className="ai-panel-more">还有 {policies.length - 5} 条，点击 PDF 导出查看</div>
+              )}
+
+              {properties.length > 0 && (
+                <>
+                  <div className="ai-panel-divider" />
+                  <div className="ai-panel-section-label">🏢 物业载体</div>
+                  {properties.slice(0, 3).map((p, i) => (
+                    <div key={i} className="ai-panel-item ai-panel-item-prop">
+                      <div className="ai-panel-item-name">{p.name || "—"}</div>
+                      <div className="ai-panel-item-meta">
+                        {p.park && <span>📍 {p.park}</span>}
+                        {p.area && <span>📐 {p.area}</span>}
                       </div>
-                      {p.expired && <span className="ai-badge ai-badge-expired">已过期</span>}
                     </div>
-                    <div className="ai-item-tags">
-                      {p.amount_s && (
-                        <span className="ai-tag ai-tag-money">
-                          💰 {p.amount_s === "待定" ? "待定" : /万|元/.test(p.amount_s) ? p.amount_s : `${p.amount_s}万元`}
-                        </span>
-                      )}
-                      {p.industry && <span className="ai-tag ai-tag-industry">🏭 {p.industry}</span>}
-                      {p.cap && <span className="ai-tag ai-tag-cap">💡 {p.cap}</span>}
-                      {p.end_date && (
-                        <span className="ai-tag ai-tag-date">📅 {p.end_date.substring(0, 10)}</span>
-                      )}
-                    </div>
-                    {p._reasons && p._reasons.length > 0 && (
-                      <div className="ai-match-reason">{p._reasons.join(" · ")}</div>
-                    )}
-                  </div>
-                ))}
-                {policies.length > 8 && (
-                  <div className="ai-list-more">还有 {policies.length - 8} 条政策，点击导出 PDF 查看全部</div>
-                )}
-              </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
-          {/* 载体列表 */}
-          {properties.length > 0 && (
-            <div className="ai-section">
-              <div className="ai-section-head">
-                <span className="ai-section-icon">🏢</span>
-                <span className="ai-section-label">物业载体</span>
-                <span className="ai-section-count">{properties.length} 条</span>
-              </div>
-              <div className="ai-list">
-                {properties.slice(0, 8).map((p, i) => (
-                  <div key={i} className="ai-list-item ai-list-item-prop">
-                    <div className="ai-item-top">
-                      <div className="ai-item-title">{p.name || "—"}</div>
-                    </div>
-                    <div className="ai-item-tags">
-                      {p.park && <span className="ai-tag ai-tag-area">📍 {p.park}</span>}
-                      {p.area && <span className="ai-tag ai-tag-size">📐 {p.area}</span>}
-                      {p.price && <span className="ai-tag ai-tag-money">💵 {p.price}</span>}
-                      {p.industry && <span className="ai-tag ai-tag-industry">🏭 {p.industry}</span>}
-                    </div>
-                  </div>
-                ))}
-                {properties.length > 8 && (
-                  <div className="ai-list-more">还有 {properties.length - 8} 条载体</div>
-                )}
-              </div>
+          {!loading && policies.length === 0 && properties.length === 0 && !error && (
+            <div className="ai-panel-hint">
+              用自然语言描述您的招商需求，AI 自动匹配政策与物业载体
             </div>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
