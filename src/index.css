@@ -248,7 +248,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 }
 .news-ticker-header { display: flex; align-items: center; gap: 6px; padding: 8px 14px; position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1.5px solid #e2e8f0; border-radius: 10px 10px 0 0; flex-shrink: 0; }
 .news-ticker-label { font-weight: 700; font-size: 12px; color: #1e293b; white-space: nowrap; background: #fff; padding: 2px 6px; border-radius: 6px; }
-.news-ticker-track-wrap { overflow: hidden; position: relative; flex: 1; padding: 6px 14px; height: 476px; }
+.news-ticker-track-wrap { overflow: visible; position: relative; flex: 1; padding: 6px 14px; height: 476px; z-index: 1; }
 .news-ticker-track { display: flex; flex-direction: column; animation: ticker-scroll 80s linear infinite; }
 .news-ticker-track.paused { animation-play-state: paused; }
 @keyframes ticker-scroll {
