@@ -1,7 +1,8 @@
 /**
  * 产业快讯 — 左侧竖排滚动面板
  */
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface NewsItem {
   time: string;
@@ -35,7 +36,6 @@ function parseDate(timeStr: string): Date {
   if (parts.length === 3) {
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   }
-  // 兼容旧格式 MM/DD
   const [month, day] = parts;
   const year = new Date().getFullYear();
   const date = new Date(year, parseInt(month) - 1, parseInt(day));
@@ -43,9 +43,49 @@ function parseDate(timeStr: string): Date {
   return date;
 }
 
+function TooltipPortal({ item, anchorRef }: { item: NewsItem; anchorRef: HTMLDivElement | null }) {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!anchorRef) return;
+    const update = () => {
+      const rect = anchorRef.getBoundingClientRect();
+      const parentRect = anchorRef.closest(".news-ticker")?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      setPos({
+        left: rect.left - parentRect.left + 10,
+        top: rect.bottom - parentRect.top + 6,
+      });
+    };
+    update();
+  }, [anchorRef]);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="news-ticker-tooltip"
+      style={{ top: pos.top, left: pos.left }}
+    >
+      <div className="tooltip-header">
+        <span
+          className="tooltip-cat"
+          style={{ background: getColor(item.category) }}
+        >
+          {item.category}
+        </span>
+        <span className="tooltip-time">{item.time}</span>
+      </div>
+      <div className="tooltip-title">{item.title}</div>
+      <div className="tooltip-summary">{item.summary}</div>
+    </div>,
+    document.body
+  );
+}
+
 export default function NewsTicker({ news }: Props) {
   const [paused, setPaused] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<NewsItem | null>(null);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
@@ -80,13 +120,20 @@ export default function NewsTicker({ news }: Props) {
       </div>
 
       <div className="news-ticker-track-wrap">
-        <div className={`news-ticker-track${paused ? " paused" : ""}`}>
+        <div className={"news-ticker-track" + (paused ? " paused" : "")}>
           {items.map((item, i) => (
             <div
               key={i}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="news-ticker-item"
-              onMouseEnter={() => setHoveredItem(item)}
-              onMouseLeave={() => setHoveredItem(null)}
+              onMouseEnter={() => {
+                setHoveredItem(item);
+                setHoveredIdx(i);
+              }}
+              onMouseLeave={() => {
+                setHoveredItem(null);
+                setHoveredIdx(null);
+              }}
             >
               <div className="news-ticker-meta">
                 <span
@@ -105,20 +152,8 @@ export default function NewsTicker({ news }: Props) {
         </div>
       </div>
 
-      {hoveredItem && hoveredItem.summary && (
-        <div className="news-ticker-tooltip">
-          <div className="tooltip-header">
-            <span
-              className="tooltip-cat"
-              style={{ background: getColor(hoveredItem.category) }}
-            >
-              {hoveredItem.category}
-            </span>
-            <span className="tooltip-time">{hoveredItem.time}</span>
-          </div>
-          <div className="tooltip-title">{hoveredItem.title}</div>
-          <div className="tooltip-summary">{hoveredItem.summary}</div>
-        </div>
+      {hoveredItem && hoveredIdx !== null && (
+        <TooltipPortal item={hoveredItem} anchorRef={itemRefs.current[hoveredIdx]} />
       )}
     </div>
   );
