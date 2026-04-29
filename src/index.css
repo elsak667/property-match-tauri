@@ -804,6 +804,18 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   line-height: 1.4;
   margin-bottom: 4px;
 }
+.ai-score {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #3b6db5;
+  border-radius: 8px;
+  padding: 1px 5px;
+  margin-right: 5px;
+  min-width: 24px;
+  text-align: center;
+}
 .ai-star { color: #f39c12; font-size: 11px; margin-right: 2px; }
 .ai-expired-tag {
   font-size: 10px;

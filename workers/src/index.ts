@@ -1,5 +1,5 @@
 /**
- * Cloudflare Workers — 飞书 API 代理
+ * Cloudflare Workers — 飞书 API 代理 + AI 智能匹配（RAG 模式）
  */
 
 interface Env {
@@ -22,6 +22,37 @@ const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/
 const SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
 
 const CACHE: Map<string, { token: string; expires: number }> = new Map();
+
+// ── Feishu 数据缓存（5分钟 TTL）───────────────────────────────────────────────
+interface DataCache {
+  policies: PolicySummary[];
+  properties: PropertySummary[];
+  ts: number;
+}
+let dataCache: DataCache | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
+interface PolicySummary {
+  name: string;
+  industry: string;
+  amount_s: string;
+  area: string;
+  subject: string;
+  end_date: string;
+  content: string;
+}
+
+interface PropertySummary {
+  name: string;
+  park: string;
+  area_total: string;
+  area_vacant: string;
+  price: string;
+  industry: string;
+  floor_height: string;
+  load: string;
+  power_kv: string;
+}
 
 async function getToken(env: Env): Promise<string> {
   const now = Date.now();
@@ -60,6 +91,134 @@ async function fetchSheet(
   return data.data?.valueRange?.values ?? [];
 }
 
+function str(v: unknown): string {
+  if (v == null || v === "") return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  if (Array.isArray(v)) {
+    return v.map(item => {
+      if (typeof item === "object" && item !== null && "text" in item) {
+        return (item as {text?: string}).text || "";
+      }
+      return String(item);
+    }).join("");
+  }
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    if (obj.text != null) return String(obj.text);
+  }
+  return String(v);
+}
+
+async function getFeishuData(env: Env): Promise<DataCache> {
+  const now = Date.now();
+  if (dataCache && dataCache.ts + CACHE_TTL > now) return dataCache;
+
+  // 并行拉取政策和物业
+  const [policyRows, unitRows] = await Promise.all([
+    fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:U600").catch(() => []),
+    fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_UNIT_SHEET_ID || "4hdJSi", "A1:ZZ500").catch(() => []),
+  ]);
+
+  const policies: PolicySummary[] = [];
+  if (policyRows.length >= 2) {
+    const headers: string[] = (policyRows[0] as unknown[]).map((v) => String(v ?? ""));
+    const idx = (key: string) => headers.findIndex(h =>
+      h.includes(key) || key.includes(h)
+    );
+    const iName = idx("政策名称"); const iInd = idx("行业"); const iAmt = idx("金额");
+    const iArea = idx("区域"); const iSubj = idx("申报主体"); const iEnd = idx("截止");
+    const iCont = idx("政策内容");
+
+    for (let r = 1; r < policyRows.length; r++) {
+      const row = policyRows[r] as unknown[];
+      if (!Array.isArray(row) || row.length === 0 || row[0] == null) continue;
+      const name = str(row[iName]); if (!name) continue;
+      const amountRaw = str(row[iAmt]);
+      let amount_s = amountRaw;
+      if (amountRaw && !/万|亿|元/.test(amountRaw) && !isNaN(Number(amountRaw))) {
+        const n = Number(amountRaw);
+        amount_s = n >= 10000 ? `${(n / 10000).toFixed(0)}亿` : `${n}万元`;
+      }
+      policies.push({
+        name, industry: str(row[iInd]), amount_s: amountRaw || "待定",
+        area: str(row[iArea]), subject: str(row[iSubj]),
+        end_date: str(row[iEnd]).substring(0, 10),
+        content: str(row[iCont]).substring(0, 100),
+      });
+      if (policies.length >= 200) break; // 限制上下文长度
+    }
+  }
+
+  const properties: PropertySummary[] = [];
+  if (unitRows.length >= 3) {
+    const headers = (unitRows[1] as unknown[]).map((v) => String(v ?? ""));
+    const idx = (key: string) => headers.findIndex(h =>
+      h.includes(key) || key.includes(h)
+    );
+    const iName = idx("单元名称"); const iPark = idx("园区"); const iArea = idx("总面积");
+    const iVac = idx("空置面积"); const iPrice = idx("租金"); const iInd = idx("行业");
+    const iFH = idx("层高"); const iLoad = idx("荷载"); const iPwr = idx("配电");
+
+    for (let r = 2; r < unitRows.length; r++) {
+      const row = unitRows[r] as unknown[];
+      if (!Array.isArray(row) || row.length === 0 || row[0] == null) continue;
+      const name = str(row[iName]); if (!name) continue;
+      properties.push({
+        name, park: str(row[iPark]),
+        area_total: str(row[iArea]) || str(row[iVac]),
+        area_vacant: str(row[iVac]),
+        price: str(row[iPrice]),
+        industry: str(row[iInd]),
+        floor_height: str(row[iFH]),
+        load: str(row[iLoad]),
+        power_kv: str(row[iPwr]),
+      });
+      if (properties.length >= 100) break;
+    }
+  }
+
+  dataCache = { policies, properties, ts: now };
+  return dataCache;
+}
+
+function buildContextSummary(data: DataCache): string {
+  const polLines = data.policies.map((p, i) =>
+    `${i + 1}. ${p.name} | 行业:${p.industry || "不限"} | 补贴:${p.amount_s} | 区域:${p.area || "不限"} | 主体:${p.subject || "不限"} | 截止:${p.end_date || "长期"}`
+  ).join("\n");
+
+  const propLines = data.properties.map((p, i) =>
+    `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`
+  ).join("\n");
+
+  return `【政策库】（共 ${data.policies.length} 条）\n${polLines}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${propLines}`;
+}
+
+const AI_SYSTEM_PROMPT_RAG = `你是一个专业的浦发集团招商政策顾问。
+
+当用户描述招商需求时，你需要：
+1. 从【政策库】中找出最匹配的 3~5 条政策，说明推荐理由
+2. 从【物业载体库】中找出最匹配的 2~3 个物业，说明推荐理由
+3. 用 JSON 格式返回结果
+
+返回格式（严格遵循）：
+{
+  "policies": [
+    {"id": 1, "name": "政策名称", "match_reason": "为什么推荐这条政策", "score": 95}
+  ],
+  "properties": [
+    {"id": 1, "name": "载体名称", "park": "园区", "match_reason": "为什么推荐这个载体", "score": 90}
+  ],
+  "summary": "对用户的整体建议（1-2句话）"
+}
+
+注意：
+- 只推荐确实相关的，不相关的不返回
+- score 是 0-100 的匹配度分数
+- match_reason 要具体说明为什么适合用户需求
+- 如果找不到匹配的，明确说明
+`;
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -71,67 +230,49 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-
-const AI_SYSTEM_PROMPT = `你是一个政策与物业载体匹配助手。用户输入自然语言查询，你需要提取出以下筛选条件：
-
-可提取的字段（全部可选）：
-- area: 区域/园区名称，如"张江"、"金桥"、"临港"等
-- industry: 行业领域，如"人工智能"、"生物医药"、"新能源"等
-- cap: 补贴力度，如"100万"、"500万"、"1000万"等（只要有具体数字）
-- keywords: 其他关键词
-
-请从用户输入中提取上述信息，返回JSON格式，不要返回其他内容。
-
-示例：
-用户输入："张江附近AI企业，补贴超过100万"
-返回：{"area":"张江","industry":"人工智能","cap":"100万","keywords":"AI企业"}
-
-用户输入："生物医药相关的载体，500平米"
-返回：{"area":"","industry":"生物医药","cap":"","keywords":"500平米"}
-
-用户输入："浦东新区有什么政策"
-返回：{"area":"浦东","industry":"","cap":"","keywords":""}
-
-用户输入："新能源载体现有那些"
-返回：{"area":"","industry":"新能源","cap":"","keywords":"载体"}
-
-请直接返回JSON，不要解释。`;
-
 async function handleAiQuery(query: string, env: Env): Promise<Response> {
   try {
+    // 1. 获取飞书数据（带缓存）
+    const data = await getFeishuData(env);
+
+    // 2. 调用 LLM（带政策/物业上下文）
     const accountId = env.AI_ACCOUNT_ID || "c877368347bac6d2c962171be40048e9";
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`;
     const body = JSON.stringify({
       messages: [
-        { role: "system", content: AI_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        { role: "system", content: AI_SYSTEM_PROMPT_RAG },
+        { role: "user", content: `【政策库】（共 ${data.policies.length} 条）\n${data.policies.map((p, i) => `${i + 1}. ${p.name} | 行业:${p.industry || "不限"} | 补贴:${p.amount_s} | 区域:${p.area || "不限"} | 主体:${p.subject || "不限"} | 截止:${p.end_date || "长期"}`).join("\n")}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${data.properties.map((p, i) => `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`).join("\n")}\n\n用户需求：${query}` },
       ],
-      max_tokens: 256,
+      max_tokens: 1024,
       stream: false,
     });
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${env.FEISHU_APP_SECRET}`,
-        "Content-Type": "application/json",
+
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${env.AI_ACCOUNT_ID || ""}`,
+          "Content-Type": "application/json",
+        },
+        body,
       },
-      body,
-    });
-    const data = await res.json() as { result?: { response?: string }; errors?: unknown[] };
-    const text: string = data?.result?.response ?? "";
-    // 提取JSON
-    const jsonMatch = text.match(/\{[^{}]*\}/s);
+    );
+    const aiData = await res.json() as { result?: { response?: string }; errors?: unknown[] };
+    const text: string = aiData?.result?.response ?? "";
+
+    // 3. 解析 JSON 返回
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
-        return json({ success: true, filters: parsed });
+        return json({ success: true, data: parsed, query });
       } catch {
-        return json({ success: true, filters: { keywords: query }, raw: text });
+        return json({ success: true, raw: text, query });
       }
     }
-    return json({ success: true, filters: { keywords: query }, raw: text });
+    return json({ success: true, raw: text, query });
   } catch (err: unknown) {
-    return json({ error: (err as Error).message }, 500);
+    return json({ success: false, error: (err as Error).message }, 500);
   }
 }
 
@@ -198,7 +339,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    // /api/ai/search?q=自然语言查询
+    // /api/ai/search?q=自然语言查询（RAG 模式）
     if (path === "/api/ai/search" && request.method === "GET") {
       const q = url.searchParams.get("q") || "";
       return handleAiQuery(q, env);
