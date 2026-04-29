@@ -31,9 +31,16 @@ function getColor(cat: string): string {
 }
 
 function parseDate(timeStr: string): Date {
-  const [month, day] = timeStr.split(" ")[0].split("/");
+  const parts = timeStr.split(" ")[0].split("/");
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+  // 兼容旧格式 MM/DD
+  const [month, day] = parts;
   const year = new Date().getFullYear();
-  return new Date(year, parseInt(month) - 1, parseInt(day));
+  const date = new Date(year, parseInt(month) - 1, parseInt(day));
+  if (date > new Date()) date.setFullYear(year - 1);
+  return date;
 }
 
 export default function NewsTicker({ news }: Props) {
