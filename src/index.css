@@ -242,7 +242,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 /* ─── News Ticker (left sidebar, vertical) ─── */
 .news-ticker {
   background: #fff; border-radius: 10px; padding: 0;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; position: relative;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: visible; position: relative;
   display: flex; flex-direction: column;
   height: 524px;
 }
@@ -608,9 +608,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 /* ─── News Ticker Tooltip ─── */
 .news-ticker-item { position: relative; }
 .news-ticker-tooltip {
-  position: absolute;
-  left: 10px;
-  top: calc(100% + 6px);
+  position: fixed;
   z-index: 100;
   width: 300px;
   background: rgba(255,255,255,.98);
