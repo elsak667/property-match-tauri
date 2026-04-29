@@ -15,7 +15,7 @@ interface Env {
   PROPERTY_PARK_SHEET_ID: string;
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
-  AI_ACCOUNT_ID: string;
+  NVIDIA_API_KEY: string;
 }
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
@@ -115,20 +115,20 @@ async function getFeishuData(env: Env): Promise<DataCache> {
   if (dataCache && dataCache.ts + CACHE_TTL > now) return dataCache;
 
   // 并行拉取政策和物业
-  const [policyRows, unitRows] = await Promise.all([
+  const [policyRows, unitRows, buildingRows] = await Promise.all([
     fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:U600").catch(() => []),
     fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_UNIT_SHEET_ID || "4hdJSi", "A1:ZZ500").catch(() => []),
+    fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_BUILDING_SHEET_ID || "4hdJSh", "A1:ZZ100").catch(() => []),
   ]);
 
+  // ── 政策摘要 ────────────────────────────────────────────────────────────────
   const policies: PolicySummary[] = [];
   if (policyRows.length >= 2) {
     const headers: string[] = (policyRows[0] as unknown[]).map((v) => String(v ?? ""));
-    const idx = (key: string) => headers.findIndex(h =>
-      h.includes(key) || key.includes(h)
-    );
-    const iName = idx("政策名称"); const iInd = idx("行业"); const iAmt = idx("金额");
-    const iArea = idx("区域"); const iSubj = idx("申报主体"); const iEnd = idx("截止");
-    const iCont = idx("政策内容");
+    const col = (name: string) => headers.indexOf(name);
+    const iName = col("policyName"); const iInd = col("行业标签"); const iAmt = col("amount");
+    const iArea = col("applicableRegion"); const iSubj = col("申报主体"); const iEnd = col("end");
+    const iCont = col("policyContent");
 
     for (let r = 1; r < policyRows.length; r++) {
       const row = policyRows[r] as unknown[];
@@ -146,35 +146,49 @@ async function getFeishuData(env: Env): Promise<DataCache> {
         end_date: str(row[iEnd]).substring(0, 10),
         content: str(row[iCont]).substring(0, 100),
       });
-      if (policies.length >= 200) break; // 限制上下文长度
+      if (policies.length >= 50) break;
+    }
+  }
+
+  // ── 物业摘要（单元 + 楼宇 join）───────────────────────────────────────────────
+  // 构建 building_id → building_name 映射
+  const buildingMap: Record<string, string> = {};
+  if (buildingRows.length >= 3) {
+    const bhdr = (buildingRows[1] as unknown[]).map((v) => String(v ?? ""));
+    const biId = bhdr.indexOf("building_id"); const biName = bhdr.indexOf("name");
+    for (let r = 2; r < buildingRows.length; r++) {
+      const row = buildingRows[r] as unknown[];
+      if (!Array.isArray(row) || !row[biId]) continue;
+      const bid = str(row[biId]); const bname = str(row[biName]);
+      if (bid && bname) buildingMap[bid] = bname;
     }
   }
 
   const properties: PropertySummary[] = [];
   if (unitRows.length >= 3) {
-    const headers = (unitRows[1] as unknown[]).map((v) => String(v ?? ""));
-    const idx = (key: string) => headers.findIndex(h =>
-      h.includes(key) || key.includes(h)
-    );
-    const iName = idx("单元名称"); const iPark = idx("园区"); const iArea = idx("总面积");
-    const iVac = idx("空置面积"); const iPrice = idx("租金"); const iInd = idx("行业");
-    const iFH = idx("层高"); const iLoad = idx("荷载"); const iPwr = idx("配电");
+    const hdr = (unitRows[1] as unknown[]).map((v) => String(v ?? ""));
+    const col = (name: string) => hdr.indexOf(name);
+    const iName = col("unit_no"); const iBid = col("building_id"); const iArea = col("area_total");
+    const iVac = col("area_vacant"); const iPrice = col("price"); const iFH = col("floor_height");
+    const iLoad = col("load"); const iPwr = col("power_kv");
 
     for (let r = 2; r < unitRows.length; r++) {
       const row = unitRows[r] as unknown[];
       if (!Array.isArray(row) || row.length === 0 || row[0] == null) continue;
       const name = str(row[iName]); if (!name) continue;
+      const bid = str(row[iBid]);
+      const bname = buildingMap[bid] || "";
       properties.push({
-        name, park: str(row[iPark]),
+        name, park: bname,
         area_total: str(row[iArea]) || str(row[iVac]),
         area_vacant: str(row[iVac]),
         price: str(row[iPrice]),
-        industry: str(row[iInd]),
+        industry: "",
         floor_height: str(row[iFH]),
         load: str(row[iLoad]),
         power_kv: str(row[iPwr]),
       });
-      if (properties.length >= 100) break;
+      if (properties.length >= 50) break;
     }
   }
 
@@ -194,30 +208,7 @@ function buildContextSummary(data: DataCache): string {
   return `【政策库】（共 ${data.policies.length} 条）\n${polLines}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${propLines}`;
 }
 
-const AI_SYSTEM_PROMPT_RAG = `你是一个专业的浦发集团招商政策顾问。
-
-当用户描述招商需求时，你需要：
-1. 从【政策库】中找出最匹配的 3~5 条政策，说明推荐理由
-2. 从【物业载体库】中找出最匹配的 2~3 个物业，说明推荐理由
-3. 用 JSON 格式返回结果
-
-返回格式（严格遵循）：
-{
-  "policies": [
-    {"id": 1, "name": "政策名称", "match_reason": "为什么推荐这条政策", "score": 95}
-  ],
-  "properties": [
-    {"id": 1, "name": "载体名称", "park": "园区", "match_reason": "为什么推荐这个载体", "score": 90}
-  ],
-  "summary": "对用户的整体建议（1-2句话）"
-}
-
-注意：
-- 只推荐确实相关的，不相关的不返回
-- score 是 0-100 的匹配度分数
-- match_reason 要具体说明为什么适合用户需求
-- 如果找不到匹配的，明确说明
-`;
+const AI_SYSTEM_PROMPT_RAG = "你是一个专业的浦发集团招商政策顾问。根据用户需求，从政策库和物业载体库中推荐最相关的选项。\n\n重要：你必须只输出纯JSON，不能输出任何其他文字、代码或解释。输出格式如下，直接以{开头：\n\n{\"policies\":[{\"name\":\"政策名称\",\"match_reason\":\"推荐理由\",\"score\":95}],\"properties\":[{\"name\":\"载体名称\",\"park\":\"园区名称\",\"match_reason\":\"推荐理由\",\"score\":90}],\"summary\":\"整体建议一句话\"}\n\n字段说明：\n- policies: 推荐的政策列表，最多5条，score为0-100的匹配度\n- properties: 推荐的物业载体，最多3条\n- summary: 1-2句话的整体建议\n- 如果没有匹配的，policies和properties数组为空，summary说明原因\n- 不要输出代码，不要输出任何标记，直接输出JSON对象";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -235,9 +226,10 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     // 1. 获取飞书数据（带缓存）
     const data = await getFeishuData(env);
 
-    // 2. 调用 LLM（带政策/物业上下文）
-    const accountId = env.AI_ACCOUNT_ID || "c877368347bac6d2c962171be40048e9";
+    // 2. 调用 NVIDIA LLM（带政策/物业上下文）
+    const nvidiaKey = env.NVIDIA_API_KEY || "";
     const body = JSON.stringify({
+      model: "meta/llama-3.1-8b-instruct",
       messages: [
         { role: "system", content: AI_SYSTEM_PROMPT_RAG },
         { role: "user", content: `【政策库】（共 ${data.policies.length} 条）\n${data.policies.map((p, i) => `${i + 1}. ${p.name} | 行业:${p.industry || "不限"} | 补贴:${p.amount_s} | 区域:${p.area || "不限"} | 主体:${p.subject || "不限"} | 截止:${p.end_date || "长期"}`).join("\n")}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${data.properties.map((p, i) => `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`).join("\n")}\n\n用户需求：${query}` },
@@ -246,19 +238,19 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
       stream: false,
     });
 
-    const res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${env.AI_ACCOUNT_ID || ""}`,
-          "Content-Type": "application/json",
-        },
-        body,
+    const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${nvidiaKey}`,
+        "Content-Type": "application/json",
       },
-    );
-    const aiData = await res.json() as { result?: { response?: string }; errors?: unknown[] };
-    const text: string = aiData?.result?.response ?? "";
+      body,
+    });
+    const aiData = await res.json() as { choices?: { message?: { content?: string } }[]; error?: unknown };
+    const text: string = aiData?.choices?.[0]?.message?.content ?? "";
+    if (!text && aiData?.error) {
+      return json({ success: false, error: JSON.stringify(aiData.error) }, 500);
+    }
 
     // 3. 解析 JSON 返回
     const jsonMatch = text.match(/\{[\s\S]*\}/);
