@@ -16,21 +16,8 @@ interface Env {
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
   NVIDIA_API_KEY: string;
+  CACHE: KVNamespace;
 }
-
-const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
-const SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
-
-const CACHE: Map<string, { token: string; expires: number }> = new Map();
-
-// ── Feishu 数据缓存（5分钟 TTL）───────────────────────────────────────────────
-interface DataCache {
-  policies: PolicySummary[];
-  properties: PropertySummary[];
-  ts: number;
-}
-let dataCache: DataCache | null = null;
-const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
 
 interface PolicySummary {
   name: string;
@@ -55,11 +42,44 @@ interface PropertySummary {
   power_kv: string;
 }
 
-async function getToken(env: Env): Promise<string> {
-  const now = Date.now();
-  const cached = CACHE.get("token");
-  if (cached && cached.expires > now + 300_000) return cached.token;
+interface DataCache {
+  policies: PolicySummary[];
+  properties: PropertySummary[];
+  updated_at: number;
+}
 
+const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
+const SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
+
+// ── KV 缓存层（30分钟 TTL）────────────────────────────────────────────────────
+const CACHE_KEY = "feishu_data";
+const CACHE_TTL_SEC = 30 * 60; // 30 分钟
+
+interface DataCache {
+  policies: PolicySummary[];
+  properties: PropertySummary[];
+  updated_at: number;
+}
+
+async function getCachedData(env: Env): Promise<DataCache | null> {
+  try {
+    const val = await env.CACHE.get(CACHE_KEY);
+    if (!val) return null;
+    const data = JSON.parse(val) as DataCache;
+    if (Date.now() - data.updated_at > CACHE_TTL_SEC * 1000) return null;
+    return data;
+  } catch { return null; }
+}
+
+async function setCachedData(env: Env, data: DataCache): Promise<void> {
+  try {
+    await env.CACHE.put(CACHE_KEY, JSON.stringify(data), {
+      expirationTtl: CACHE_TTL_SEC + 60,
+    });
+  } catch { /* 静默失败，不阻塞请求 */ }
+}
+
+async function getToken(env: Env): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -69,7 +89,6 @@ async function getToken(env: Env): Promise<string> {
   if (data.code !== 0 || !data.tenant_access_token) {
     throw new Error(`Token error ${data.code}: ${data.msg}`);
   }
-  CACHE.set("token", { token: data.tenant_access_token, expires: now + 7200_000 });
   return data.tenant_access_token;
 }
 
@@ -112,10 +131,15 @@ function str(v: unknown): string {
 }
 
 async function getFeishuData(env: Env): Promise<DataCache> {
-  const now = Date.now();
-  if (dataCache && dataCache.ts + CACHE_TTL > now) return dataCache;
+  const cached = await getCachedData(env);
+  if (cached) return cached;
+  const data = await refreshFeishuData(env);
+  setCachedData(env, data).catch(() => {});
+  return data;
+}
 
-  // 并行拉取政策 + 物业（单元、楼宇、园区）
+// 获取飞书数据并构建缓存
+async function refreshFeishuData(env: Env): Promise<DataCache> {
   const [policyRows, unitRows, buildingRows, parkRows] = await Promise.all([
     fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:U600").catch(() => []),
     fetchSheet(env, env.PROPERTY_SHEET, env.PROPERTY_UNIT_SHEET_ID || "4hdJSi", "A1:ZZ500").catch(() => []),
@@ -222,8 +246,8 @@ async function getFeishuData(env: Env): Promise<DataCache> {
     }
   }
 
-  dataCache = { policies, properties, ts: now };
-  return dataCache;
+  const data: DataCache = { policies, properties, updated_at: Date.now() };
+  return data;
 }
 
 function buildContextSummary(data: DataCache): string {
@@ -409,5 +433,15 @@ export default {
       });
     }
     return handleFetch(request, env);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    try {
+      const data = await refreshFeishuData(env);
+      await setCachedData(env, data);
+      console.log(`[CRON] 缓存刷新: ${data.policies.length}条政策 ${data.properties.length}条物业`);
+    } catch (err) {
+      console.error("[CRON] 缓存刷新失败:", err);
+    }
   },
 };

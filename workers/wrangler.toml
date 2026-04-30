@@ -3,6 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2025-01-09"
 workers_dev = true
 
+[[kv_namespaces]]
+binding = "CACHE"
+id = "778e6e44328545219e8a72cc1dac98b8"
+
+[triggers]
+crons = ["*/30 * * * *"]
+
 [vars]
 PROPERTY_SHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg"
 PROPERTY_BUILDING_SHEET_ID = "4hdJSh"
