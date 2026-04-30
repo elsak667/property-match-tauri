@@ -410,6 +410,36 @@ const AI_SYSTEM_PROMPT_RAG = `你是一个专业的浦发集团招商政策顾�
 - policies最多5条，properties最多3条
 - 如果某类没有匹配，该数组为空`;
 
+const AI_SYSTEM_PROMPT_INTENT = `你是一个浦发集团招商顾问助手。请从用户的查询中提取结构化信息，输出纯JSON（以{开头，无其他文字）。
+
+用户查询格式可能是：
+- "招引/招商XX行业/规模企业"（业务人员想找的目标企业）
+- "XX行业企业补贴/优惠政策"
+- "需要XX平米/配电/荷载的载体"
+- "在XX区域找物业"
+- "XX企业想入驻/落地"
+
+请提取以下字段（没有的填空字符串）：
+{
+  "industry": "目标行业，如：人工智能、芯片半导体、生物医药（只填行业，不要企业名）",
+  "intent": "意图：recruit=招引企业落地，subsidy=申请政策补贴，space=寻找物业载体，info=查询了解",
+  "company_type": "企业类型，如：独角兽、专精特新、上市公司、中小型，初创企业",
+  "space_area": "面积需求（只填数字，如：500、1000、2000）",
+  "power_kv": "配电需求（填数字如500、1000）",
+  "district": "偏好区域，如：张江、金桥、浦东（只填区域名）",
+  "budget": "租金预算（填数字，单位元/㎡·天）",
+  "summary": "一句话总结用户需求的本质"
+}
+
+示例：
+查询："招引AI芯片独角兽，需要1000平米，双回路电，张江区域"
+输出：{"industry":"芯片半导体","intent":"recruit","company_type":"独角兽","space_area":"1000","power_kv":"","district":"张江","budget":"","summary":"招引AI芯片独角兽企业，1000平米，双回路电，张江"}
+
+查询："人工智能企业补贴，最高500万"
+输出：{"industry":"人工智能","intent":"subsidy","company_type":"","space_area":"","power_kv":"","district":"","budget":"","summary":"查询人工智能企业可申请的政策补贴"}
+
+输出JSON：`;
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -423,83 +453,74 @@ function json(body: unknown, status = 200): Response {
 
 async function handleAiQuery(query: string, env: Env): Promise<Response> {
   try {
-    // 1. 获取飞书数据（带缓存）
     const data = await getFeishuData(env);
+    const nvidiaKey = env.NVIDIA_API_KEY || "";
 
-    // 2. 结构化评分 + top-k 检索
+    // 关键词评分
     const scoredPolicies = data.policies.map((p, i) => scorePolicy(query, p, i));
     const scoredProperties = data.properties.map((p, i) => scoreProperty(query, p, i));
 
-    // 归一化：各类最高分 = 100，其他按比例折算
-    const maxPol = Math.max(...scoredPolicies.map((p) => p.score), 0);
-    const maxProp = Math.max(...scoredProperties.map((p) => p.score), 0);
-    const norm = (raw: number, max: number): number =>
-      max === 0 ? 0 : Math.round((raw / max) * 100);
+    // 基于关键词类型的意图加权（无需 LLM 调用，避免中文乱码）
+    const q = query.toLowerCase();
+    const isRecruit = /招引|引进|落地|入驻|搬迁|选址|扩大|扩产|新设/.test(q);
+    const isSubsidy = /补贴|资助|奖励|扶持|优惠|减免|申报|申请|政策/.test(q);
+    const isSpace = /面积|平米|平方|层高|荷载|配电|电力|租金|载体|楼宇|园区|厂房|办公室/.test(q);
 
-    const normPolicies = scoredPolicies
+    const propMultiplier = isRecruit || isSpace ? 1.3 : isSubsidy ? 0.8 : 1.0;
+    const polMultiplier = isSubsidy ? 1.3 : isRecruit ? 0.8 : 1.0;
+
+    const boostedPolicies = scoredPolicies.map((p) => ({ ...p, score: Math.min(Math.round(p.score * polMultiplier), 100) }));
+    const boostedProperties = scoredProperties.map((p) => ({ ...p, score: Math.min(Math.round(p.score * propMultiplier), 100) }));
+
+    const maxPol = Math.max(...boostedPolicies.map((p) => p.score), 0);
+    const maxProp = Math.max(...boostedProperties.map((p) => p.score), 0);
+    const norm = (raw: number, max: number): number => max === 0 ? 0 : Math.round((raw / max) * 100);
+
+    const topPolicies = boostedPolicies
       .map((p) => ({ ...p, score: norm(p.score, maxPol) }))
       .filter((p) => p.score >= 10)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
-    const normProperties = scoredProperties
+    const topProperties = boostedProperties
       .map((p) => ({ ...p, score: norm(p.score, maxProp) }))
       .filter((p) => p.score >= 10)
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
 
-    if (normPolicies.length === 0 && normProperties.length === 0) {
-      return json({
-        success: true,
-        data: { policies: [], properties: [], summary: `未找到与"${query}"直接相关的政策或物业，建议调整关键词或扩大搜索范围。` },
-        query,
-      });
+    if (topPolicies.length === 0 && topProperties.length === 0) {
+      return json({ success: true, data: { policies: [], properties: [], summary: `未找到与"${query}"直接相关的政策或物业，建议调整关键词或扩大搜索范围。` }, query });
     }
 
-    // 3. 把 top-k 详情 + 已算好的分数送给 LLM，让它生成理由
-    const nvidiaKey = env.NVIDIA_API_KEY || "";
-    const policyCtx = normPolicies.map((p) =>
-      `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`
-    ).join("\n");
-    const propCtx = normProperties.map((p) =>
-      `【得分${p.score}】${p.detail.name} | 楼宇:${p.detail.building || "—"} | 园区:${p.detail.park || "—"} | 面积:${p.detail.area_total || p.detail.area_vacant || "—"}㎡ | 租金:${p.detail.price || "—"}元/㎡·天 | 行业:${p.detail.industry || "不限"}`
-    ).join("\n");
+    // RAG 理由生成
+    const policyCtx = topPolicies.map((p) => `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`).join("\n");
+    const propCtx = topProperties.map((p) => `【得分${p.score}】${p.building || p.name}（${p.park || "—"}）| 单元:${p.name} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"}`).join("\n");
 
-    const body = JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
-      messages: [
-        { role: "system", content: AI_SYSTEM_PROMPT_RAG },
-        { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
-      ],
-      max_tokens: 1024,
-      stream: false,
-    });
-
-    const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    const ragRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${nvidiaKey}`,
-        "Content-Type": "application/json",
-      },
-      body,
+      headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "meta/llama-3.1-8b-instruct",
+        messages: [
+          { role: "system", content: AI_SYSTEM_PROMPT_RAG },
+          { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
+        ],
+        max_tokens: 1024,
+        stream: false,
+      }),
     });
-    const aiData = await res.json() as { choices?: { message?: { content?: string } }[]; error?: unknown };
-    const text: string = aiData?.choices?.[0]?.message?.content ?? "";
-    if (!text && aiData?.error) {
-      return json({ success: false, error: JSON.stringify(aiData.error) }, 500);
-    }
+    const ragText: string = (await ragRes.json() as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
 
-    // 4. 解析 JSON 返回
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonMatch = ragText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         return json({ success: true, data: parsed, query });
       } catch {
-        return json({ success: true, raw: text, query });
+        return json({ success: true, raw: ragText, query });
       }
     }
-    return json({ success: true, raw: text, query });
+    return json({ success: true, raw: ragText, query });
   } catch (err: unknown) {
     return json({ success: false, error: (err as Error).message }, 500);
   }
