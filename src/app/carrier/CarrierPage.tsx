@@ -1,18 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { loadIndustries, matchProperties, loadPropertyData } from "../../lib/policy";
-import type { Property, PropertyMatchResult } from "../../lib/policy";
+import { loadIndustries, loadPropertyData } from "../../lib/policy";
+import { filterProperties, type PropertyFilterUnit } from "../../lib/workers";
 import PropertyMap from "../../components/PropertyMap";
-
-const YES_NO_OPTIONS = ["不限", "是", "否"];
 
 export default function CarrierPage() {
   const [query, setQuery] = useState({
     areaMin: "", areaMax: "", priceMax: "",
-    loadMin: "", heightMin: "", powerKVMin: "",
-    buildingType: "", is104Block: "不限",
-    industry: "", tolerance: 60,
+    heightMin: "",
+    building: "", district: "", industry: "",
   });
 
   const [allUnits, setAllUnits] = useState<Property[]>([]);

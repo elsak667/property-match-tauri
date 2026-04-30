@@ -3,6 +3,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { openPrintHtmlRaw } from "../lib/pdfgen_new";
+import BuildingDetailPanel from "./BuildingDetailPanel";
 
 // RAG API 返回类型
 interface AiPolicyMatch {
@@ -15,6 +16,7 @@ interface AiPropertyMatch {
   id: number;
   name: string;
   building: string;
+  building_id: string;
   park: string;
   match_reason: string;
   score: number;
@@ -48,6 +50,7 @@ export default function AIAssistant() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<AiSearchResult | null>(null);
   const [filters, setFilters] = useState<string>("");
+  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭
@@ -195,7 +198,7 @@ ${propTable}
                   <div className="ai-panel-divider" />
                   <div className="ai-panel-section-label">🏢 物业载体</div>
                   {result.properties.map((p, i) => (
-                    <div key={i} className="ai-panel-item ai-panel-item-prop">
+                    <div key={i} className="ai-panel-item ai-panel-item-prop" style={{ cursor: "pointer" }} onClick={() => p.building_id && setActiveBuildingId(p.building_id)}>
                       <div className="ai-panel-item-name">
                         <span className="ai-score">{p.score}</span>
                         {p.building || p.name}
@@ -203,6 +206,7 @@ ${propTable}
                       <div className="ai-panel-item-meta">
                         {p.park && <span>📍 {p.park}</span>}
                         {p.match_reason}
+                        {p.building_id && <span style={{ color: "#3b6db5", marginLeft: 6 }}>查看详情 →</span>}
                       </div>
                     </div>
                   ))}
@@ -212,6 +216,9 @@ ${propTable}
           )}
 
         </div>
+      )}
+      {activeBuildingId && (
+        <BuildingDetailPanel buildingId={activeBuildingId} onClose={() => setActiveBuildingId(null)} />
       )}
     </>
   );
