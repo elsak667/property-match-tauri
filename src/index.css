@@ -637,7 +637,7 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
 /* ══════════════════════════════════════════
    Mobile Responsive — 768px and below
    ══════════════════════════════════════════ */
-/* ─── AI 浮窗助手 ─── */
+/* ─── 浮窗助手按钮 ─── */
 .ai-fab {
   position: fixed;
   bottom: 80px;
@@ -646,21 +646,25 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b6db5, #5b9bd5);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(59, 109, 181, 0.4);
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-size: 24px;
 }
-.ai-fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 24px rgba(59, 109, 181, 0.5);
+.ai-fab:hover { transform: scale(1.1) translateY(-2px); }
+.ai-fab-icon { color: #fff; font-size: 22px; pointer-events: none; }
+
+/* AI 助手 — 蓝紫渐变 */
+.ai-fab.ai-fab-ai {
+  background: linear-gradient(135deg, #3b6db5 0%, #7c5cbf 100%);
+  box-shadow: 0 4px 20px rgba(59, 109, 181, 0.45), 0 0 0 0 rgba(59,109,181,0);
 }
-.ai-fab-icon { color: #fff; font-size: 24px; }
+.ai-fab.ai-fab-ai:hover {
+  box-shadow: 0 8px 32px rgba(59, 109, 181, 0.5), 0 0 0 4px rgba(59,109,181,0.15);
+}
 .ai-fab-dot {
   position: absolute;
   top: 4px;
@@ -671,69 +675,92 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   border-radius: 50%;
   border: 2px solid #fff;
 }
+
+/* 反馈 — 橙色渐变 */
+.ai-fab.ai-fab-feedback {
+  right: 88px;
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+}
+.ai-fab.ai-fab-feedback:hover {
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.5), 0 0 0 4px rgba(245,158,11,0.15);
+}
+
+/* ─── 浮窗面板 ─── */
 .ai-panel {
   position: fixed;
   bottom: 145px;
-  right: 24px;
   z-index: 998;
   width: 360px;
   max-height: 520px;
-  background: rgba(248, 252, 255, 0.97);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(59, 109, 181, 0.2);
-  border-radius: 16px;
-  box-shadow: 0 8px 40px rgba(59, 109, 181, 0.2);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 12px 60px rgba(0, 0, 0, 0.14);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: fadeInUp 0.25s ease;
+  animation: panelSlideIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+.ai-panel.ai-panel-ai { right: 24px; }
+.ai-panel.ai-panel-feedback { right: 88px; }
+
+@keyframes panelSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .ai-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 14px 16px 12px;
-  background: linear-gradient(135deg, #3b6db5, #5b9bd5);
   color: #fff;
-  border-radius: 16px 16px 0 0;
+  border-radius: 18px 18px 0 0;
+}
+.ai-panel.ai-panel-ai .ai-panel-header {
+  background: linear-gradient(135deg, #3b6db5 0%, #7c5cbf 100%);
+}
+.ai-panel.ai-panel-feedback .ai-panel-header {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
 }
 .ai-panel-title { font-size: 14px; font-weight: 700; flex: 1; }
 .ai-panel-close {
-  background: none; border: none; color: #fff; cursor: pointer;
-  font-size: 16px; padding: 2px 6px; border-radius: 6px; opacity: 0.8;
-  transition: opacity 0.2s;
+  background: rgba(255,255,255,0.2); border: none; color: #fff; cursor: pointer;
+  font-size: 16px; padding: 2px 8px; border-radius: 8px; opacity: 0.85;
+  transition: opacity 0.2s, background 0.2s;
 }
-.ai-panel-close:hover { opacity: 1; }
+.ai-panel-close:hover { opacity: 1; background: rgba(255,255,255,0.3); }
 .ai-panel-search {
   display: flex;
   gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(59, 109, 181, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 .ai-panel-input {
   flex: 1;
-  padding: 9px 12px;
-  border: 1.5px solid rgba(59, 109, 181, 0.2);
-  border-radius: 10px;
-  font-size: 13px;
+  padding: 10px 14px;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  font-size: 13.5px;
   outline: none;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
   font-family: inherit;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.ai-panel-input:focus { border-color: #3b6db5; }
-.ai-panel-input::placeholder { color: #a0b8d8; }
+.ai-panel-input:focus {
+  border-color: #7c5cbf;
+  box-shadow: 0 0 0 3px rgba(124, 92, 191, 0.12);
+}
+.ai-panel-input::placeholder { color: #a0aec0; }
+textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 .ai-panel-btn {
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, #3b6db5, #5b9bd5);
+  background: linear-gradient(135deg, #3b6db5 0%, #7c5cbf 100%);
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 16px;
   display: flex;
@@ -969,8 +996,11 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   .footer-warning { font-size: 11px !important; }
   .footer-credit { font-size: 10px !important; }
 
-  /* ─── AI 浮窗助手 移动端 ─── */
-  .ai-fab { bottom: 85px; right: 16px; width: 46px; height: 46px; font-size: 20px; }
-  .ai-panel { width: calc(100vw - 32px) !important; right: 16px !important; bottom: 145px !important; max-height: 60vh; }
+  /* ─── 浮窗助手 移动端 ─── */
+  .ai-fab { bottom: 85px; right: 16px; width: 46px; height: 46px; }
+  .ai-fab.ai-fab-feedback { right: 70px; }
+  .ai-panel { width: calc(100vw - 32px) !important; max-height: 60vh; }
+  .ai-panel.ai-panel-ai { right: 16px !important; bottom: 145px !important; }
+  .ai-panel.ai-panel-feedback { right: 16px !important; bottom: 145px !important; }
   .ai-panel-input { font-size: 14px; padding: 10px 12px; }
 }

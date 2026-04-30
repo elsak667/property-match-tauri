@@ -9,7 +9,7 @@ async function submitFeedback(data: { title: string; content: string; contact: s
   const res = await fetch(`${BASE}/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, source: window.location.href }),
   });
   const json = await res.json() as { success?: boolean; error?: string };
   if (!json.success) throw new Error(json.error || "提交失败");
@@ -54,13 +54,12 @@ export default function Feedback() {
 
   return (
     <>
-      <button className="ai-fab" onClick={() => setOpen(!open)} aria-label="意见反馈"
-        style={{ bottom: "90px", background: "#3b6db5" }}>
+      <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
         <span className="ai-fab-icon">{open ? "✕" : "💬"}</span>
       </button>
 
       {open && (
-        <div className="ai-panel" ref={panelRef}>
+        <div className="ai-panel ai-panel-feedback" ref={panelRef}>
           <div className="ai-panel-header">
             <span>💬</span>
             <span className="ai-panel-title">意见反馈</span>
