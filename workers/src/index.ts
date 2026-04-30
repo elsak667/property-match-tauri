@@ -17,6 +17,7 @@ interface Env {
   PROPERTY_INDUSTRY_SHEET_ID: string;
   FEEDBACK_SHEET: string;
   FEEDBACK_SHEET_ID: string;
+  SERVERCHAN_KEY: string;
   NVIDIA_API_KEY: string;
   CACHE: KVNamespace;
 }
@@ -417,7 +418,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return json(items);
     }
 
-    // /api/feedback — 提交反馈到飞书表格
+    // /api/feedback — 提交反馈（飞书表格 + Server酱推送）
     if (path === "/api/feedback" && request.method === "POST") {
       let body: { title?: string; content?: string; contact?: string };
       try {
@@ -425,33 +426,36 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       } catch {
         return json({ success: false, error: "Invalid JSON" }, 400);
       }
-      const { title = "", content = "", contact = "" } = body;
+      const { title = "", content = "", contact = "", source = "" } = body;
       if (!title.trim() || !content.trim()) {
         return json({ success: false, error: "标题和内容不能为空" }, 400);
       }
 
+      // 1. 写入飞书表格（永久留存）
       const FEEDBACK_SHEET = env.FEEDBACK_SHEET || "";
       const FEEDBACK_SHEET_ID = env.FEEDBACK_SHEET_ID || "";
-      if (!FEEDBACK_SHEET || !FEEDBACK_SHEET_ID) {
-        return json({ success: false, error: "未配置反馈表格" }, 500);
+      if (FEEDBACK_SHEET && FEEDBACK_SHEET_ID) {
+        const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
+        const values = [[now, title.trim(), content.trim(), contact.trim(), source.trim()]];
+        const token = await getToken(env);
+        await fetch(
+          `${SHEET_URL}/${FEEDBACK_SHEET}/values/${FEEDBACK_SHEET_ID}!A1:ZZ1:append`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ valueRange: { values } }),
+          }
+        );
       }
 
-      const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
-      const values = [[now, title.trim(), content.trim(), contact.trim()]];
-
-      const token = await getToken(env);
-      const res = await fetch(
-        `${SHEET_URL}/${FEEDBACK_SHEET}/values/${FEEDBACK_SHEET_ID}!A1:ZZ1:append`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ valueRange: { values } }),
-        }
-      );
-      const result = await res.json() as { code?: number; msg?: string };
-      if (result.code !== 0) {
-        return json({ success: false, error: result.msg || "写入失败" }, 500);
+      // 2. Server酱推送（可选，免费版每天10条）
+      const sckey = env.SERVERCHAN_KEY;
+      if (sckey) {
+        const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
+        const text = `💬 招商平台反馈\n【${title.trim()}】\n${content.trim()}\n联系方式：${contact.trim() || "未填写"}\n来源：${source.trim() || "未知"}\n时间：${now}`;
+        fetch(`https://sc.ftqq.com/${sckey}.send?text=${encodeURIComponent(text)}`).catch(() => {});
       }
+
       return json({ success: true });
     }
 
