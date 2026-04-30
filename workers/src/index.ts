@@ -15,6 +15,8 @@ interface Env {
   PROPERTY_PARK_SHEET_ID: string;
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
+  FEEDBACK_SHEET: string;
+  FEEDBACK_SHEET_ID: string;
   NVIDIA_API_KEY: string;
   CACHE: KVNamespace;
 }
@@ -415,6 +417,44 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return json(items);
     }
 
+    // /api/feedback — 提交反馈到飞书表格
+    if (path === "/api/feedback" && request.method === "POST") {
+      let body: { title?: string; content?: string; contact?: string };
+      try {
+        body = await request.json();
+      } catch {
+        return json({ success: false, error: "Invalid JSON" }, 400);
+      }
+      const { title = "", content = "", contact = "" } = body;
+      if (!title.trim() || !content.trim()) {
+        return json({ success: false, error: "标题和内容不能为空" }, 400);
+      }
+
+      const FEEDBACK_SHEET = env.FEEDBACK_SHEET || "";
+      const FEEDBACK_SHEET_ID = env.FEEDBACK_SHEET_ID || "";
+      if (!FEEDBACK_SHEET || !FEEDBACK_SHEET_ID) {
+        return json({ success: false, error: "未配置反馈表格" }, 500);
+      }
+
+      const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
+      const values = [[now, title.trim(), content.trim(), contact.trim()]];
+
+      const token = await getToken(env);
+      const res = await fetch(
+        `${SHEET_URL}/${FEEDBACK_SHEET}/values/${FEEDBACK_SHEET_ID}!A1:ZZ1:append`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ valueRange: { values } }),
+        }
+      );
+      const result = await res.json() as { code?: number; msg?: string };
+      if (result.code !== 0) {
+        return json({ success: false, error: result.msg || "写入失败" }, 500);
+      }
+      return json({ success: true });
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err: unknown) {
     return json({ error: (err as Error).message }, 500);
@@ -427,7 +467,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
       });
