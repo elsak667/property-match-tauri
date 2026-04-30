@@ -694,6 +694,29 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: #3b6db5; ba
   margin-bottom: 4px;
 }
 .feedback-required { color: #ef4444; }
+.feedback-type-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.feedback-type-btn {
+  padding: 4px 12px;
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 20px;
+  background: rgba(245, 158, 11, 0.05);
+  color: #92400e;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.feedback-type-btn:hover { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.feedback-type-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
 
 /* 反馈 — 橙色渐变 */
 .ai-fab.ai-fab-feedback {

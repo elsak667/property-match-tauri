@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 
 const BASE = "https://api.elsak.eu.org/api";
 
-async function submitFeedback(data: { content: string; contact: string }) {
+async function submitFeedback(data: { type: string; content: string; contact: string }) {
   const res = await fetch(`${BASE}/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -15,6 +15,8 @@ async function submitFeedback(data: { content: string; contact: string }) {
   if (!json.success) throw new Error(json.error || "提交失败");
 }
 
+const TYPES = ["建议", "优化", "新需求", "BUG"];
+
 export default function Feedback() {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
@@ -22,6 +24,7 @@ export default function Feedback() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [type, setType] = useState("建议");
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,16 +43,16 @@ export default function Feedback() {
     setLoading(true);
     setError("");
     try {
-      await submitFeedback({ content: content.trim(), contact: contact.trim() });
+      await submitFeedback({ type, content: content.trim(), contact: contact.trim() });
       setSuccess(true);
-      setContent(""); setContact("");
+      setType("建议"); setContent(""); setContact("");
       setTimeout(() => { setSuccess(false); setOpen(false); }, 2000);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [content, contact]);
+  }, [type, content, contact]);
 
   return (
     <>
@@ -72,44 +75,56 @@ export default function Feedback() {
             </div>
           ) : (
             <>
-              {/* 标题栏 */}
-          <div className="ai-panel-search" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", paddingBottom: 0 }}>
-            <div className="feedback-type-badge">意见反馈</div>
-          </div>
+              <div className="ai-panel-search" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", paddingBottom: 0 }}>
+                <div className="feedback-type-badge">{type}</div>
+              </div>
 
-          <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div className="feedback-field-label">问题描述 <span className="feedback-required">*</span></div>
-            <textarea
-              className="ai-panel-input"
-              placeholder="请详细描述遇到的问题或改进建议..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              disabled={loading}
-              rows={4}
-              style={{ resize: "vertical", lineHeight: 1.6 }}
-            />
-            <div className="feedback-field-label" style={{ marginTop: "4px" }}>联系方式（选填）</div>
-            <input
-              className="ai-panel-input"
-              placeholder="手机号 / 邮箱 / 姓名..."
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+              <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div className="feedback-field-label">问题类型</div>
+                  <div className="feedback-type-row">
+                    {TYPES.map((t) => (
+                      <button
+                        key={t}
+                        className={`feedback-type-btn${type === t ? " active" : ""}`}
+                        onClick={() => setType(t)}
+                      >{t}</button>
+                    ))}
+                  </div>
+                </div>
 
-          {error && <div className="ai-panel-error">⚠️ {error}</div>}
+                <div className="feedback-field-label">问题描述 <span className="feedback-required">*</span></div>
+                <textarea
+                  className="ai-panel-input"
+                  placeholder="请详细描述遇到的问题或改进建议..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  disabled={loading}
+                  rows={4}
+                  style={{ resize: "vertical", lineHeight: 1.6 }}
+                />
+                <div className="feedback-field-label" style={{ marginTop: "4px" }}>联系方式（选填）</div>
+                <input
+                  className="ai-panel-input"
+                  placeholder="手机号 / 邮箱 / 姓名..."
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
 
-          <div style={{ padding: "0 16px 16px" }}>
-            <button
-              className="ai-panel-btn"
-              style={{ width: "100%", fontSize: "14px", padding: "10px" }}
-              onClick={handleSubmit}
-              disabled={loading || !content.trim()}
-            >
-              {loading ? "提交中..." : "提交反馈"}
-            </button>
-          </div>
+              {error && <div className="ai-panel-error">⚠️ {error}</div>}
+
+              <div style={{ padding: "0 16px 16px" }}>
+                <button
+                  className="ai-panel-btn"
+                  style={{ width: "100%", fontSize: "14px", padding: "10px" }}
+                  onClick={handleSubmit}
+                  disabled={loading || !content.trim()}
+                >
+                  {loading ? "提交中..." : "提交反馈"}
+                </button>
+              </div>
             </>
           )}
         </div>
