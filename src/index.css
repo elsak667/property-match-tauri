@@ -879,6 +879,28 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   font-size: 12px;
   color: #8ba5c8;
 }
+.ai-panel-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px 12px;
+  border-top: 1px solid rgba(59, 109, 181, 0.08);
+}
+.ai-panel-hint-chip {
+  padding: 4px 10px;
+  border: 1.5px solid rgba(59, 109, 181, 0.25);
+  border-radius: 20px;
+  background: rgba(59, 109, 181, 0.05);
+  color: #3b6db5;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.ai-panel-hint-chip:hover {
+  border-color: #3b6db5;
+  background: rgba(59, 109, 181, 0.12);
+}
 .ai-panel-body {
   flex: 1;
   overflow-y: auto;

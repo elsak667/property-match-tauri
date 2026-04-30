@@ -14,6 +14,7 @@ interface AiPolicyMatch {
 interface AiPropertyMatch {
   id: number;
   name: string;
+  building: string;
   park: string;
   match_reason: string;
   score: number;
@@ -25,6 +26,13 @@ interface AiSearchResult {
 }
 
 const BASE = "https://api.elsak.eu.org/api";
+
+const QUERY_SUGGESTIONS = [
+  "张江 AI 企业 100 万补贴",
+  "浦东芯片半导体载体",
+  "人工智能企业租金优惠",
+  "新能源物业载体",
+];
 
 async function aiSearch(q: string): Promise<AiSearchResult> {
   const res = await fetch(`${BASE}/ai/search?q=${encodeURIComponent(q)}`);
@@ -138,6 +146,21 @@ ${propTable}
             </button>
           </div>
 
+          {/* 建议性输入提示 */}
+          {!result && !loading && (
+            <div className="ai-panel-hints">
+              {QUERY_SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  className="ai-panel-hint-chip"
+                  onClick={() => { setQuery(s); setOpen(true); }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
           {error && <div className="ai-panel-error">⚠️ {error}</div>}
 
           {result && (
@@ -175,7 +198,7 @@ ${propTable}
                     <div key={i} className="ai-panel-item ai-panel-item-prop">
                       <div className="ai-panel-item-name">
                         <span className="ai-score">{p.score}</span>
-                        {p.name}
+                        {p.building || p.name}
                       </div>
                       <div className="ai-panel-item-meta">
                         {p.park && <span>📍 {p.park}</span>}
@@ -188,11 +211,6 @@ ${propTable}
             </div>
           )}
 
-          {!loading && !result && !error && (
-            <div className="ai-panel-hint">
-              用自然语言描述您的招商需求，AI 基于飞书实时数据为您推荐
-            </div>
-          )}
         </div>
       )}
     </>
