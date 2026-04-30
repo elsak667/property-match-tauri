@@ -3,7 +3,6 @@
  */
 import NewsTicker from "../../components/NewsTicker";
 import AIAssistant from "../../components/AIAssistant";
-import Feedback from "../../components/Feedback";
 
 declare global {
   interface Window {
@@ -110,7 +109,6 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
 
       {/* AI 智能助手 */}
       <AIAssistant />
-      <Feedback />
 
       {/* 产业快讯 + 模块卡片 */}
       <div className="home-modules">

@@ -3,6 +3,8 @@ import PolicyPage from "./app/policy/PolicyPage";
 import CarrierPage from "./app/carrier/CarrierPage";
 import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
+import Feedback from "./components/Feedback";
+import AIAssistant from "./components/AIAssistant";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
 
@@ -50,6 +52,8 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+      <AIAssistant />
+      <Feedback />
     </div>
   );
 }
