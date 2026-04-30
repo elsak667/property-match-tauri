@@ -97,12 +97,12 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             <div className="stat-label">物业载体</div>
           </div>
           <div className="stat-card">
-            <div className="stat-num">3</div>
-            <div className="stat-label">已启用模块</div>
+            <div className="stat-num">v2.2</div>
+            <div className="stat-label">AI智能匹配</div>
           </div>
           <div className="stat-card">
-            <div className="stat-num">1</div>
-            <div className="stat-label">待开发模块</div>
+            <div className="stat-num">2/4</div>
+            <div className="stat-label">模块进度</div>
           </div>
         </div>
       </div>
