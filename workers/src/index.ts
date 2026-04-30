@@ -33,7 +33,8 @@ interface PolicySummary {
 }
 
 interface PropertySummary {
-  name: string;
+  name: string;      // 单元编号
+  building: string;   // 楼宇名称
   park: string;
   district: string;
   area_total: string;
@@ -236,7 +237,8 @@ async function refreshFeishuData(env: Env): Promise<DataCache> {
       const pname = parkMap[pid] || bInfo.name || "";
       const pdist = parkDistrictMap[pid] || "";
       properties.push({
-        name, park: pname, district: pdist,
+        name, building: bInfo.name || "",
+        park: pname, district: pdist,
         area_total: str(row[iArea]) || str(row[iVac]),
         area_vacant: str(row[iVac]),
         price: str(row[iPrice]),
@@ -354,6 +356,7 @@ interface ScoredPolicy {
 interface ScoredProperty {
   id: number;
   name: string;
+  building: string;
   park: string;
   score: number;
   hits: string[];
@@ -380,30 +383,32 @@ function scorePolicy(query: string, policy: PolicySummary, id: number): ScoredPo
 function scoreProperty(query: string, prop: PropertySummary, id: number): ScoredProperty {
   const { score, hits } = keywordScore(
     query,
-    prop.name,
+    prop.name,         // 单元编号
+    prop.building,    // 楼宇名称（核心检索字段）
     prop.park,
     prop.district,
     prop.industry,
   );
-  const titleKw = keywordSet(prop.name);
+  const titleKw = keywordSet(prop.building || prop.name);
   for (const w of keywordSet(query)) {
-    if (titleKw.has(w)) return { id, name: prop.name, park: prop.park, score: Math.min(score + 20, 100), hits, detail: prop };
+    if (titleKw.has(w)) return { id, name: prop.name, building: prop.building, park: prop.park, score: Math.min(score + 20, 100), hits, detail: prop };
   }
-  return { id, name: prop.name, park: prop.park, score, hits, detail: prop };
+  return { id, name: prop.name, building: prop.building, park: prop.park, score, hits, detail: prop };
 }
 
 const AI_SYSTEM_PROMPT_RAG = `你是一个专业的浦发集团招商政策顾问。你的任务是根据已计算好的匹配分数，为每条命中的政策或物业生成一句简洁的推荐理由。
 
-匹配分数已由系统基于关键词重叠度计算，你的理由必须：
-1. 直接引用该条目中与用户需求相关联的具体字段值（如：补贴金额、面积、园区名称、行业标签等）
-2. 一句话说完，不要重复标题，不要模糊表述
-3. 输出纯JSON，格式如下，以{开头：
+重要约束：
+1. 理由中必须引用具体字段值（补贴金额、面积、园区、楼栋名称等），不能模糊表述
+2. 物业理由中楼栋名称是核心信息，必须在理由中体现（如"位于XX楼宇XX㎡"）
+3. 你的输出score字段必须原样使用下面提供的已计算好的分数，不得自行更改
+4. 一句话说完，不要重复标题
+5. 输出纯JSON，以{开头，不要任何其他文字：
 
-{"policies":[{"name":"政策名称","match_reason":"该政策可获最高X万元补贴，覆盖行业为X，适用于X区域，申报主体为X","score":90}],"properties":[{"name":"载体名称","park":"园区名称","match_reason":"位于X园区，面积X㎡，租金X元/㎡·天，适合X行业","score":85}],"summary":"整体建议一句话"}
+{"policies":[{"name":"政策名称","match_reason":"该政策可获最高X万元补贴，覆盖行业为X，适用于X区域，申报主体为X","score":90}],"properties":[{"name":"单元编号","building":"楼宇名称","park":"园区名称","match_reason":"位于X楼宇，面积X㎡，租金X元/㎡·天，适合X行业","score":85}],"summary":"整体建议一句话"}
 
 - policies最多5条，properties最多3条
-- 如果某类没有匹配，该数组为空
-- 不要输出代码或标记，直接输出JSON对象`;
+- 如果某类没有匹配，该数组为空`;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -423,18 +428,27 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
 
     // 2. 结构化评分 + top-k 检索
     const scoredPolicies = data.policies.map((p, i) => scorePolicy(query, p, i));
-    const topPolicies = scoredPolicies
-      .filter((p) => p.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
-
     const scoredProperties = data.properties.map((p, i) => scoreProperty(query, p, i));
-    const topProperties = scoredProperties
-      .filter((p) => p.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
 
-    if (topPolicies.length === 0 && topProperties.length === 0) {
+    // 归一化：各类最高分 = 100，其他按比例折算
+    const maxPol = Math.max(...scoredPolicies.map((p) => p.score), 0);
+    const maxProp = Math.max(...scoredProperties.map((p) => p.score), 0);
+    const norm = (raw: number, max: number): number =>
+      max === 0 ? 0 : Math.round((raw / max) * 100);
+
+    const normPolicies = scoredPolicies
+      .map((p) => ({ ...p, score: norm(p.score, maxPol) }))
+      .filter((p) => p.score >= 10)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    const normProperties = scoredProperties
+      .map((p) => ({ ...p, score: norm(p.score, maxProp) }))
+      .filter((p) => p.score >= 10)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    if (normPolicies.length === 0 && normProperties.length === 0) {
       return json({
         success: true,
         data: { policies: [], properties: [], summary: `未找到与"${query}"直接相关的政策或物业，建议调整关键词或扩大搜索范围。` },
@@ -444,18 +458,18 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
 
     // 3. 把 top-k 详情 + 已算好的分数送给 LLM，让它生成理由
     const nvidiaKey = env.NVIDIA_API_KEY || "";
-    const policyCtx = topPolicies.map((p) =>
+    const policyCtx = normPolicies.map((p) =>
       `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`
     ).join("\n");
-    const propCtx = topProperties.map((p) =>
-      `【得分${p.score}】${p.detail.name} | 园区:${p.detail.park || "—"} | 面积:${p.detail.area_total || p.detail.area_vacant || "—"}㎡ | 租金:${p.detail.price || "—"}元/㎡·天 | 行业:${p.detail.industry || "不限"}`
+    const propCtx = normProperties.map((p) =>
+      `【得分${p.score}】${p.detail.name} | 楼宇:${p.detail.building || "—"} | 园区:${p.detail.park || "—"} | 面积:${p.detail.area_total || p.detail.area_vacant || "—"}㎡ | 租金:${p.detail.price || "—"}元/㎡·天 | 行业:${p.detail.industry || "不限"}`
     ).join("\n");
 
     const body = JSON.stringify({
       model: "meta/llama-3.1-8b-instruct",
       messages: [
         { role: "system", content: AI_SYSTEM_PROMPT_RAG },
-        { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分）】\n${propCtx}` },
+        { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
       ],
       max_tokens: 1024,
       stream: false,
@@ -586,13 +600,13 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
 
     // /api/feedback — 提交反馈（飞书表格 + Server酱推送）
     if (path === "/api/feedback" && request.method === "POST") {
-      let body: { type?: string; content?: string; contact?: string; source?: string };
+      let body: { type?: string; content?: string; contact?: string; source?: string; screenshot?: string };
       try {
         body = await request.json();
       } catch {
         return json({ success: false, error: "Invalid JSON" }, 400);
       }
-      const { type = "建议", content = "", contact = "", source = "" } = body;
+      const { type = "建议", content = "", contact = "", source = "", screenshot = "" } = body;
       if (!content.trim()) {
         return json({ success: false, error: "问题描述不能为空" }, 400);
       }
@@ -604,22 +618,59 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
         const nowMs = Date.now();
         const remark = [contact.trim(), source.trim()].filter(Boolean).join(" | ");
         const token = await getToken(env);
-        await fetch(
+
+        // 截图：上传到飞书获得 file_token，再写入附件字段
+        const fields: Record<string, unknown> = {
+          "问题描述": content.trim(),
+          "类型": type,
+          "反馈时间": nowMs,
+          "当前状态": ["新增"],
+        };
+        if (remark) fields["备注说明"] = remark;
+
+        if (screenshot && screenshot.startsWith("data:image/")) {
+          try {
+            const mime = screenshot.match(/data:([^;]+);/)?.[1] || "image/png";
+            const ext = mime.split("/")[1]?.replace("jpeg", "jpg") || "png";
+            const base64 = screenshot.replace(/^data:image\/\w+;base64,/, "");
+            const binary = atob(base64);
+            const arr = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+            const blob = new Blob([arr], { type: mime });
+            const formData = new FormData();
+            formData.append("file", blob, `screenshot.${ext}`);
+            formData.append("file_name", `screenshot.${ext}`);
+            formData.append("size", String(blob.size));
+            const uploadRes = await fetch(
+              "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all",
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+              }
+            );
+            const uploadData = await uploadRes.json() as { code?: number; data?: { file_token?: string } };
+            if (uploadData.code === 0 && uploadData.data?.file_token) {
+              fields["截图"] = [uploadData.data.file_token];
+            }
+          } catch {
+            // 截图上传失败不影响主流程
+          }
+        }
+
+        const bitableRes = await fetch(
           `https://open.feishu.cn/open-apis/bitable/v1/apps/${bitableToken}/tables/${tableId}/records`,
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fields: {
-                "问题描述": content.trim(),
-                "类型": [type],
-                "反馈时间": nowMs,
-                "当前状态": ["新增"],
-                ...(remark ? { "备注说明": remark } : {}),
-              },
-            }),
+            body: JSON.stringify({ fields }),
           }
         );
+        const bitableData = await bitableRes.json() as { code?: number; msg?: string };
+        if (bitableData.code !== 0) {
+          console.log("Bitable write failed:", JSON.stringify(bitableData));
+          return json({ success: false, error: `飞书写入失败: ${bitableData.msg}` }, 500);
+        }
       }
 
       // 2. Server酱推送（可选，免费版每天10条）

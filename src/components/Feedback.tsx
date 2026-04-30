@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 
 const BASE = "https://api.elsak.eu.org/api";
 
-async function submitFeedback(data: { type: string; content: string; contact: string }) {
+async function submitFeedback(data: { type: string; content: string; contact: string; screenshot?: string }) {
   const res = await fetch(`${BASE}/feedback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -25,7 +25,26 @@ export default function Feedback() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [type, setType] = useState("建议");
+  const [screenshot, setScreenshot] = useState<string>("");
+  const [uploadingImg, setUploadingImg] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("图片大小不能超过 5MB");
+      return;
+    }
+    setUploadingImg(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setScreenshot(ev.target?.result as string);
+      setUploadingImg(false);
+    };
+    reader.onerror = () => { setError("图片读取失败"); setUploadingImg(false); };
+    reader.readAsDataURL(file);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -43,16 +62,16 @@ export default function Feedback() {
     setLoading(true);
     setError("");
     try {
-      await submitFeedback({ type, content: content.trim(), contact: contact.trim() });
+      await submitFeedback({ type, content: content.trim(), contact: contact.trim(), screenshot });
       setSuccess(true);
-      setType("建议"); setContent(""); setContact("");
+      setType("建议"); setContent(""); setContact(""); setScreenshot("");
       setTimeout(() => { setSuccess(false); setOpen(false); }, 2000);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [type, content, contact]);
+  }, [type, content, contact, screenshot]);
 
   return (
     <>
@@ -75,10 +94,6 @@ export default function Feedback() {
             </div>
           ) : (
             <>
-              <div className="ai-panel-search" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)", paddingBottom: 0 }}>
-                <div className="feedback-type-badge">{type}</div>
-              </div>
-
               <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div>
                   <div className="feedback-field-label">问题类型</div>
@@ -103,6 +118,32 @@ export default function Feedback() {
                   rows={4}
                   style={{ resize: "vertical", lineHeight: 1.6 }}
                 />
+
+                <div className="feedback-field-label">截图（选填）</div>
+                <div className="feedback-image-row">
+                  {screenshot ? (
+                    <div className="feedback-image-preview">
+                      <img src={screenshot} alt="截图预览" />
+                      <button
+                        className="feedback-image-remove"
+                        onClick={() => setScreenshot("")}
+                        disabled={loading}
+                      >✕</button>
+                    </div>
+                  ) : null}
+                  <label className={`feedback-image-upload${uploadingImg ? " disabled" : ""}`}>
+                    {uploadingImg ? "读取中..." : "+ 添加截图"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleImageChange}
+                      disabled={loading || uploadingImg}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                </div>
+
                 <div className="feedback-field-label" style={{ marginTop: "4px" }}>联系方式（选填）</div>
                 <input
                   className="ai-panel-input"
