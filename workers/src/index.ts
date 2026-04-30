@@ -265,7 +265,145 @@ function buildContextSummary(data: DataCache): string {
   return `【政策库】（共 ${data.policies.length} 条）\n${polLines}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${propLines}`;
 }
 
-const AI_SYSTEM_PROMPT_RAG = "你是一个专业的浦发集团招商政策顾问。根据用户需求，从政策库和物业载体库中推荐最相关的选项。\n\n重要：你必须只输出纯JSON，不能输出任何其他文字、代码或解释。输出格式如下，直接以{开头：\n\n{\"policies\":[{\"name\":\"政策名称\",\"match_reason\":\"推荐理由\",\"score\":95}],\"properties\":[{\"name\":\"载体名称\",\"park\":\"园区名称\",\"match_reason\":\"推荐理由\",\"score\":90}],\"summary\":\"整体建议一句话\"}\n\n字段说明：\n- policies: 推荐的政策列表，最多5条，score为0-100的匹配度\n- properties: 推荐的物业载体，最多3条\n- summary: 1-2句话的整体建议\n- 如果没有匹配的，policies和properties数组为空，summary说明原因\n- 不要输出代码，不要输出任何标记，直接输出JSON对象";
+// ── 结构化评分 + 理由生成 ────────────────────────────────────────────────────
+
+// 英文关键词 → 中文扩展词（提升中英文混合查询召回率）
+const EXPANSIONS: Record<string, string[]> = {
+  ai: ["人工智能", "ai", "AI", "Artificial Intelligence"],
+  "5g": ["5G", "第五代移动通信"],
+  "3g": ["3G", "第三代移动通信"],
+  "4g": ["4G", "第四代移动通信"],
+  iot: ["物联网"],
+  物联网: ["IoT"],
+  ic: ["芯片", "集成电路", "半导体"],
+  ev: ["新能源汽车", "电动车"],
+  人工智能: ["AI", "人工智能"],
+  人工智能: ["AI"],
+};
+
+function expandQuery(q: string): string[] {
+  const lower = q.toLowerCase();
+  const out: string[] = [lower];
+  // 整体查询词扩展
+  const full = EXPANSIONS[lower];
+  if (full) out.push(...full);
+  // 空格分词扩展
+  const tokens = lower.split(/\s+/);
+  for (const token of tokens) {
+    const expanded = EXPANSIONS[token];
+    if (expanded) out.push(...expanded);
+    // 英文+中文混合词，提取英文前缀做扩展（如 ai企业补贴 → ai）
+    const english = token.match(/^[a-z0-9]+/i);
+    if (english) {
+      const prefix = english[0].toLowerCase();
+      const ep = EXPANSIONS[prefix];
+      if (ep) out.push(...ep);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function keywordSet(text: string): Set<string> {
+  const out = new Set<string>();
+  // 空格分词
+  text.toLowerCase()
+    .replace(/[^a-z0-9一-鿿]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1)
+    .forEach((w) => out.add(w));
+  // 中文 2-gram（帮助"人工智能企业"匹配"人工智能"）
+  const chinese = text.match(/[一-鿿]{2,}/g);
+  if (chinese) {
+    for (const seg of chinese) {
+      for (let i = 0; i < seg.length - 1; i++) {
+        out.add(seg.slice(i, i + 2));
+      }
+    }
+  }
+  return out;
+}
+
+function keywordScore(query: string, ...fields: string[]): { score: number; hits: string[] } {
+  const expanded = expandQuery(query);
+  const hits: string[] = [];
+  let score = 0;
+  for (const field of fields) {
+    if (!field) continue;
+    const lowerField = field.toLowerCase();
+    for (const w of expanded) {
+      const lw = w.toLowerCase();
+      if (lw.length < 2) continue;
+      // 精确 token 匹配（最高权重，字段本身的分词命中）
+      const fSet = keywordSet(field);
+      if (fSet.has(lw)) { score += 15; hits.push(w); }
+      // 字段全文包含该词（次高权重，字符串子串命中）
+      else if (lowerField.includes(lw)) { score += 7; hits.push(w); }
+    }
+  }
+  return { score: Math.min(score, 100), hits: [...new Set(hits)] };
+}
+
+interface ScoredPolicy {
+  id: number;
+  name: string;
+  score: number;
+  hits: string[];
+  detail: PolicySummary;
+}
+
+interface ScoredProperty {
+  id: number;
+  name: string;
+  park: string;
+  score: number;
+  hits: string[];
+  detail: PropertySummary;
+}
+
+function scorePolicy(query: string, policy: PolicySummary, id: number): ScoredPolicy {
+  const { score, hits } = keywordScore(
+    query,
+    policy.name,
+    policy.industry,
+    policy.area,
+    policy.subject,
+    policy.amount_s,
+    policy.content,
+  );
+  const titleKw = keywordSet(policy.name);
+  for (const w of keywordSet(query)) {
+    if (titleKw.has(w)) return { id, name: policy.name, score: Math.min(score + 20, 100), hits, detail: policy };
+  }
+  return { id, name: policy.name, score, hits, detail: policy };
+}
+
+function scoreProperty(query: string, prop: PropertySummary, id: number): ScoredProperty {
+  const { score, hits } = keywordScore(
+    query,
+    prop.name,
+    prop.park,
+    prop.district,
+    prop.industry,
+  );
+  const titleKw = keywordSet(prop.name);
+  for (const w of keywordSet(query)) {
+    if (titleKw.has(w)) return { id, name: prop.name, park: prop.park, score: Math.min(score + 20, 100), hits, detail: prop };
+  }
+  return { id, name: prop.name, park: prop.park, score, hits, detail: prop };
+}
+
+const AI_SYSTEM_PROMPT_RAG = `你是一个专业的浦发集团招商政策顾问。你的任务是根据已计算好的匹配分数，为每条命中的政策或物业生成一句简洁的推荐理由。
+
+匹配分数已由系统基于关键词重叠度计算，你的理由必须：
+1. 直接引用该条目中与用户需求相关联的具体字段值（如：补贴金额、面积、园区名称、行业标签等）
+2. 一句话说完，不要重复标题，不要模糊表述
+3. 输出纯JSON，格式如下，以{开头：
+
+{"policies":[{"name":"政策名称","match_reason":"该政策可获最高X万元补贴，覆盖行业为X，适用于X区域，申报主体为X","score":90}],"properties":[{"name":"载体名称","park":"园区名称","match_reason":"位于X园区，面积X㎡，租金X元/㎡·天，适合X行业","score":85}],"summary":"整体建议一句话"}
+
+- policies最多5条，properties最多3条
+- 如果某类没有匹配，该数组为空
+- 不要输出代码或标记，直接输出JSON对象`;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -283,13 +421,41 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     // 1. 获取飞书数据（带缓存）
     const data = await getFeishuData(env);
 
-    // 2. 调用 NVIDIA LLM（带政策/物业上下文）
+    // 2. 结构化评分 + top-k 检索
+    const scoredPolicies = data.policies.map((p, i) => scorePolicy(query, p, i));
+    const topPolicies = scoredPolicies
+      .filter((p) => p.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+
+    const scoredProperties = data.properties.map((p, i) => scoreProperty(query, p, i));
+    const topProperties = scoredProperties
+      .filter((p) => p.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    if (topPolicies.length === 0 && topProperties.length === 0) {
+      return json({
+        success: true,
+        data: { policies: [], properties: [], summary: `未找到与"${query}"直接相关的政策或物业，建议调整关键词或扩大搜索范围。` },
+        query,
+      });
+    }
+
+    // 3. 把 top-k 详情 + 已算好的分数送给 LLM，让它生成理由
     const nvidiaKey = env.NVIDIA_API_KEY || "";
+    const policyCtx = topPolicies.map((p) =>
+      `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`
+    ).join("\n");
+    const propCtx = topProperties.map((p) =>
+      `【得分${p.score}】${p.detail.name} | 园区:${p.detail.park || "—"} | 面积:${p.detail.area_total || p.detail.area_vacant || "—"}㎡ | 租金:${p.detail.price || "—"}元/㎡·天 | 行业:${p.detail.industry || "不限"}`
+    ).join("\n");
+
     const body = JSON.stringify({
       model: "meta/llama-3.1-8b-instruct",
       messages: [
         { role: "system", content: AI_SYSTEM_PROMPT_RAG },
-        { role: "user", content: `【政策库】（共 ${data.policies.length} 条）\n${data.policies.map((p, i) => `${i + 1}. ${p.name} | 行业:${p.industry || "不限"} | 补贴:${p.amount_s} | 区域:${p.area || "不限"} | 主体:${p.subject || "不限"} | 截止:${p.end_date || "长期"}`).join("\n")}\n\n【物业载体库】（共 ${data.properties.length} 条）\n${data.properties.map((p, i) => `${i + 1}. ${p.name} | 园区:${p.park || "—"} | 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | 层高:${p.floor_height || "—"}m | 荷载:${p.load || "—"}kg/㎡ | 配电:${p.power_kv || "—"}kVA`).join("\n")}\n\n用户需求：${query}` },
+        { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分）】\n${propCtx}` },
       ],
       max_tokens: 1024,
       stream: false,
@@ -309,7 +475,7 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
       return json({ success: false, error: JSON.stringify(aiData.error) }, 500);
     }
 
-    // 3. 解析 JSON 返回
+    // 4. 解析 JSON 返回
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
