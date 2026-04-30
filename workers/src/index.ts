@@ -420,15 +420,15 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
 
     // /api/feedback — 提交反馈（飞书表格 + Server酱推送）
     if (path === "/api/feedback" && request.method === "POST") {
-      let body: { title?: string; content?: string; contact?: string };
+      let body: { type?: string; content?: string; contact?: string; source?: string };
       try {
         body = await request.json();
       } catch {
         return json({ success: false, error: "Invalid JSON" }, 400);
       }
-      const { title = "", content = "", contact = "", source = "" } = body;
-      if (!title.trim() || !content.trim()) {
-        return json({ success: false, error: "标题和内容不能为空" }, 400);
+      const { type = "建议", content = "", contact = "", source = "" } = body;
+      if (!content.trim()) {
+        return json({ success: false, error: "问题描述不能为空" }, 400);
       }
 
       // 1. 写入飞书多维表格（永久留存）
@@ -446,7 +446,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
             body: JSON.stringify({
               fields: {
                 "问题描述": content.trim(),
-                "类型": "意见反馈",
+                "类型": [type],
                 "反馈时间": nowMs,
                 "当前状态": ["新增"],
                 ...(remark ? { "备注说明": remark } : {}),
@@ -460,7 +460,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       const sckey = env.SERVERCHAN_KEY;
       if (sckey) {
         const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
-        const text = `💬 招商平台反馈\n【${title.trim()}】\n${content.trim()}\n联系方式：${contact.trim() || "未填写"}\n来源：${source.trim() || "未知"}\n时间：${now}`;
+        const text = `💬 招商平台反馈 [${type}]\n${content.trim()}\n联系方式：${contact.trim() || "未填写"}\n来源：${source.trim() || "未知"}\n时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`;
         fetch(`https://sc.ftqq.com/${sckey}.send?text=${encodeURIComponent(text)}`).catch(() => {});
       }
 
