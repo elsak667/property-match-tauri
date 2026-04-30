@@ -15,8 +15,8 @@ interface Env {
   PROPERTY_PARK_SHEET_ID: string;
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
-  FEEDBACK_SHEET: string;
-  FEEDBACK_SHEET_ID: string;
+  FEEDBACK_BITABLE_TOKEN: string;
+  FEEDBACK_TABLE_ID: string;
   SERVERCHAN_KEY: string;
   NVIDIA_API_KEY: string;
   CACHE: KVNamespace;
@@ -431,19 +431,27 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
         return json({ success: false, error: "标题和内容不能为空" }, 400);
       }
 
-      // 1. 写入飞书表格（永久留存）
-      const FEEDBACK_SHEET = env.FEEDBACK_SHEET || "";
-      const FEEDBACK_SHEET_ID = env.FEEDBACK_SHEET_ID || "";
-      if (FEEDBACK_SHEET && FEEDBACK_SHEET_ID) {
-        const now = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
-        const values = [[now, title.trim(), content.trim(), contact.trim(), source.trim()]];
+      // 1. 写入飞书多维表格（永久留存）
+      const bitableToken = env.FEEDBACK_BITABLE_TOKEN || "";
+      const tableId = env.FEEDBACK_TABLE_ID || "";
+      if (bitableToken && tableId) {
+        const nowMs = Date.now();
+        const remark = [contact.trim(), source.trim()].filter(Boolean).join(" | ");
         const token = await getToken(env);
         await fetch(
-          `${SHEET_URL}/${FEEDBACK_SHEET}/values/${FEEDBACK_SHEET_ID}!A1:ZZ1:append`,
+          `https://open.feishu.cn/open-apis/bitable/v1/apps/${bitableToken}/tables/${tableId}/records`,
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ valueRange: { values } }),
+            body: JSON.stringify({
+              fields: {
+                "问题描述": content.trim(),
+                "类型": "意见反馈",
+                "反馈时间": nowMs,
+                "当前状态": ["新增"],
+                ...(remark ? { "备注说明": remark } : {}),
+              },
+            }),
           }
         );
       }
