@@ -19,6 +19,7 @@ interface Env {
   FEEDBACK_TABLE_ID: string;
   SERVERCHAN_KEY: string;
   NVIDIA_API_KEY: string;
+  HF_ACCESS_TOKEN: string;
   CACHE: KVNamespace;
 }
 
@@ -176,7 +177,7 @@ async function refreshFeishuData(env: Env): Promise<DataCache> {
         amount_s = n >= 10000 ? `${(n / 10000).toFixed(0)}亿` : `${n}万元`;
       }
       policies.push({
-        name, industry: str(row[iInd]), amount_s: amountRaw || "待定",
+        name, industry: str(row[iInd]), amount_s: amount_s || "待定",
         area: str(row[iArea]), subject: str(row[iSubj]),
         end_date: str(row[iEnd]).substring(0, 10),
         content: str(row[iCont]).substring(0, 100),
@@ -280,7 +281,6 @@ const EXPANSIONS: Record<string, string[]> = {
   ic: ["芯片", "集成电路", "半导体"],
   ev: ["新能源汽车", "电动车"],
   人工智能: ["AI", "人工智能"],
-  人工智能: ["AI"],
 };
 
 function expandQuery(q: string): string[] {
@@ -451,6 +451,67 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+const EMBEDDING_MODEL = "BAAI/bge-base-zh-v1.5";
+const EMBEDDING_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${EMBEDDING_MODEL}`;
+
+async function getHybridPolicyScores(query: string, policies: PolicySummary[], env: Env): Promise<Record<number, number>> {
+  // 尝试向量相似度（KV 中已有 policy_embeddings 时）
+  const embStr = await env.CACHE.get("policy_embeddings");
+  if (!embStr) return {};
+
+  let queryVec: number[] | null = null;
+  for (let retries = 0; retries < 3; retries++) {
+    try {
+      const res = await fetch(EMBEDDING_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${env.HF_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: [query], options: { wait_for_model: true } }),
+      });
+      if (!res.ok) throw new Error(`HF ${res.status}`);
+      queryVec = (await res.json() as number[][])[0];
+      break;
+    } catch { await new Promise(r => setTimeout(r, 2000)); }
+  }
+  if (!queryVec) return {};
+
+  // 读原始 sheet 取 id→text 映射（用于 id 对齐）
+  const policyRows = await fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:T600").catch(() => []);
+  if (policyRows.length < 2) return {};
+
+  const hdr = (policyRows[0] as unknown[]).map((v) => String(v ?? ""));
+  const iId = hdr.indexOf("id");
+  const iName = hdr.indexOf("policyName");
+  const iCond = hdr.indexOf("policyCondition");
+  const iCont = hdr.indexOf("policyContent");
+
+  const policyTextById: Record<string, string> = {};
+  for (let r = 1; r < policyRows.length; r++) {
+    const row = policyRows[r] as unknown[];
+    if (!Array.isArray(row) || row[iId] == null) continue;
+    const id = String(row[iId]);
+    const text = [str(row[iName]), str(row[iCond]), str(row[iCont])]
+      .filter(Boolean).join(" ").slice(0, 2000);
+    if (text) policyTextById[id] = text;
+  }
+
+  // 从 KV 读嵌入（id 为 string → number 对齐）
+  const policyEmbeddings = JSON.parse(embStr) as Record<string, number[]>;
+  const hybridScores: Record<number, number> = {};
+
+  for (let i = 0; i < policies.length; i++) {
+    const pol = policies[i];
+    // 从 PolicySummary.name 找对应 id（sheet 的 id 列不存在于 PolicySummary，用 index对齐）
+    // 用 index 直接对齐 KV 中的 id（KV 中 id 为飞书行 id）
+    const idStr = String(i);
+    const vec = policyEmbeddings[idStr];
+    if (!vec) continue;
+    let dot = 0;
+    for (let k = 0; k < queryVec.length; k++) dot += queryVec[k] * (vec[k] ?? 0);
+    hybridScores[i] = dot; // 0~1 范围
+  }
+  return hybridScores;
+}
+
 async function handleAiQuery(query: string, env: Env): Promise<Response> {
   try {
     const data = await getFeishuData(env);
@@ -460,7 +521,10 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     const scoredPolicies = data.policies.map((p, i) => scorePolicy(query, p, i));
     const scoredProperties = data.properties.map((p, i) => scoreProperty(query, p, i));
 
-    // 基于关键词类型的意图加权（无需 LLM 调用，避免中文乱码）
+    // 向量相似度（异步，不阻塞）
+    const hybridPromise = getHybridPolicyScores(query, data.policies, env);
+
+    // 基于关键词类型的意图加权
     const q = query.toLowerCase();
     const isRecruit = /招引|引进|落地|入驻|搬迁|选址|扩大|扩产|新设/.test(q);
     const isSubsidy = /补贴|资助|奖励|扶持|优惠|减免|申报|申请|政策/.test(q);
@@ -471,6 +535,20 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
 
     const boostedPolicies = scoredPolicies.map((p) => ({ ...p, score: Math.min(Math.round(p.score * polMultiplier), 100) }));
     const boostedProperties = scoredProperties.map((p) => ({ ...p, score: Math.min(Math.round(p.score * propMultiplier), 100) }));
+
+    // 等待向量相似度结果并混合
+    const hybridScores = await hybridPromise;
+    if (Object.keys(hybridScores).length > 0) {
+      const maxKw = Math.max(...boostedPolicies.map(p => p.score), 1);
+      for (const [idx, vecScore] of Object.entries(hybridScores)) {
+        const i = Number(idx);
+        if (boostedPolicies[i]) {
+          const kwNorm = boostedPolicies[i].score / maxKw;       // 归一化关键词分
+          const hybrid = kwNorm * 0.6 + vecScore * 0.4;          // 混合
+          boostedPolicies[i] = { ...boostedPolicies[i], score: Math.min(Math.round(hybrid * 100), 100) };
+        }
+      }
+    }
 
     const maxPol = Math.max(...boostedPolicies.map((p) => p.score), 0);
     const maxProp = Math.max(...boostedProperties.map((p) => p.score), 0);
@@ -593,6 +671,121 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     if (path === "/api/ai/search" && request.method === "GET") {
       const q = url.searchParams.get("q") || "";
       return handleAiQuery(q, env);
+    }
+
+    // /api/embeddings/generate — 触发生成政策向量并存 KV（仅供初始化或强制刷新）
+    if (path === "/api/embeddings/generate" && request.method === "POST") {
+      const token = url.searchParams.get("secret") || "";
+      if (token !== env.HF_ACCESS_TOKEN) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+      const policyRows = await fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:T600");
+      if (policyRows.length < 2) {
+        return json({ error: "No policy data" }, 400);
+      }
+      const headers: string[] = (policyRows[0] as unknown[]).map((v) => String(v ?? ""));
+      const col = (name: string) => headers.indexOf(name);
+      const iId = col("id"); const iName = col("policyName");
+      const iCond = col("policyCondition"); const iCont = col("policyContent");
+
+      // 构建 id → 文本
+      const policyTexts: { id: string; text: string }[] = [];
+      for (let r = 1; r < policyRows.length; r++) {
+        const row = policyRows[r] as unknown[];
+        if (!Array.isArray(row) || row[iId] == null) continue;
+        const id = String(row[iId]);
+        const text = [str(row[iName]), str(row[iCond]), str(row[iCont])]
+          .filter(Boolean).join(" ").slice(0, 2000);
+        if (text) policyTexts.push({ id, text });
+      }
+
+      // 分批调用 HF Inference API（每批 50 条，HF 限制 50/请求）
+      const EMBEDDING_MODEL = "BAAI/bge-base-zh-v1.5";
+      const EMBEDDING_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${EMBEDDING_MODEL}`;
+      const BATCH_SIZE = 50;
+      const embeddings: Record<string, number[]> = {};
+
+      for (let i = 0; i < policyTexts.length; i += BATCH_SIZE) {
+        const batch = policyTexts.slice(i, i + BATCH_SIZE);
+        const texts = batch.map(p => p.text);
+
+        let retries = 0, vecs: number[][] | null = null;
+        while (retries < 3) {
+          try {
+            const res = await fetch(EMBEDDING_URL, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${env.HF_ACCESS_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
+            });
+            if (!res.ok) throw new Error(`HF ${res.status}: ${await res.text()}`);
+            vecs = await res.json() as number[][];
+            break;
+          } catch (e) {
+            retries++;
+            await new Promise(r => setTimeout(r, retries * 2000));
+          }
+        }
+
+        if (vecs) {
+          for (let j = 0; j < batch.length; j++) {
+            embeddings[batch[j].id] = vecs[j];
+          }
+          await env.CACHE.put("policy_embeddings", JSON.stringify(embeddings));
+          console.log(`[EMBEDDINGS] 已生成 ${Object.keys(embeddings).length}/${policyTexts.length} 条`);
+        } else {
+          console.warn(`[EMBEDDINGS] batch ${i}-${i + batch.length} 全部失败`);
+        }
+        await new Promise(r => setTimeout(r, 1000)); // 避免 HF 限速
+      }
+
+      return json({ success: true, count: Object.keys(embeddings).length, dim: Object.values(embeddings)[0]?.length ?? 0 });
+    }
+
+    // /api/embeddings/match?q=查询词 — 向量相似度匹配
+    if (path === "/api/embeddings/match" && request.method === "GET") {
+      const q = url.searchParams.get("q") || "";
+      if (!q) return json({ error: "q required" }, 400);
+
+      // 获取预存的政策向量
+      const embStr = await env.CACHE.get("policy_embeddings");
+      if (!embStr) {
+        return json({ error: "Embeddings not generated yet. POST /api/embeddings/generate first." }, 503);
+      }
+      const policyEmbeddings = JSON.parse(embStr) as Record<string, number[]>;
+
+      // 生成查询向量
+      const EMBEDDING_MODEL = "BAAI/bge-base-zh-v1.5";
+      const EMBEDDING_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${EMBEDDING_MODEL}`;
+      let queryVec: number[] | null = null;
+      for (let retries = 0; retries < 3; retries++) {
+        try {
+          const res = await fetch(EMBEDDING_URL, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${env.HF_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ inputs: [q], options: { wait_for_model: true } }),
+          });
+          if (!res.ok) throw new Error(`HF ${res.status}`);
+          queryVec = (await res.json() as number[][])[0];
+          break;
+        } catch { await new Promise(r => setTimeout(r, 2000)); }
+      }
+      if (!queryVec) return json({ error: "Failed to encode query" }, 503);
+
+      // 余弦相似度（向量已归一化，直接点积）
+      const scores: { id: string; score: number }[] = [];
+      for (const [pid, vec] of Object.entries(policyEmbeddings)) {
+        let dot = 0;
+        for (let i = 0; i < queryVec.length; i++) dot += queryVec[i] * (vec[i] ?? 0);
+        scores.push({ id: pid, score: dot });
+      }
+      scores.sort((a, b) => b.score - a.score);
+
+      // 返回 top-20 id 列表
+      const topIds = scores.slice(0, 20).map(s => s.id);
+      return json({ success: true, top_ids: topIds, query: q });
     }
 
     // /api/properties?type=园区|楼宇|单元|产业字典
@@ -726,6 +919,7 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const start = Date.now();
     try {
       const data = await refreshFeishuData(env);
       await setCachedData(env, data);
@@ -733,5 +927,65 @@ export default {
     } catch (err) {
       console.error("[CRON] 缓存刷新失败:", err);
     }
+
+    // 每 6 小时或 KV 向量为空时，触发 embedding 生成
+    const lastGen = await env.CACHE.get("embeddings_generated_at").catch(() => null);
+    const stale = !lastGen || (Date.now() - Number(lastGen) > 6 * 60 * 60 * 1000);
+    if (stale) {
+      console.log(`[CRON] 向量${lastGen ? "过期" : "未生成"}，开始生成…`);
+      await generatePolicyEmbeddings(env);
+    }
+    console.log(`[CRON] 总耗时 ${Date.now() - start}ms`);
   },
 };
+
+async function generatePolicyEmbeddings(env: Env): Promise<void> {
+  try {
+    const policyRows = await fetchSheet(env, env.POLICY_SHEET, env.POLICY_SHEET_ID, "A1:T600");
+      if (policyRows.length < 2) return;
+      const hdr = (policyRows[0] as unknown[]).map((v) => String(v ?? ""));
+      const iId = hdr.indexOf("id"); const iName = hdr.indexOf("policyName");
+      const iCond = hdr.indexOf("policyCondition"); const iCont = hdr.indexOf("policyContent");
+      const policyTexts: { id: string; text: string }[] = [];
+      for (let r = 1; r < policyRows.length; r++) {
+        const row = policyRows[r] as unknown[];
+        if (!Array.isArray(row) || row[iId] == null) continue;
+        const id = String(row[iId]);
+        const text = [str(row[iName]), str(row[iCond]), str(row[iCont])]
+          .filter(Boolean).join(" ").slice(0, 2000);
+        if (text) policyTexts.push({ id, text });
+      }
+      if (policyTexts.length === 0) return;
+      const BATCH_SIZE = 50;
+      const embeddings: Record<string, number[]> = {};
+      for (let i = 0; i < policyTexts.length; i += BATCH_SIZE) {
+        const batch = policyTexts.slice(i, i + BATCH_SIZE);
+        let retries = 0, vecs: number[][] | null = null;
+        while (retries < 3) {
+          try {
+            const res = await fetch(EMBEDDING_URL, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${env.HF_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ inputs: batch.map(p => p.text), options: { wait_for_model: true } }),
+            });
+            if (!res.ok) throw new Error(`HF ${res.status}: ${await res.text()}`);
+            vecs = await res.json() as number[][];
+            break;
+          } catch (e) {
+            retries++;
+            await new Promise(r => setTimeout(r, retries * 2000));
+          }
+        }
+        if (vecs) {
+          for (let j = 0; j < batch.length; j++) embeddings[batch[j].id] = vecs[j];
+          await env.CACHE.put("policy_embeddings", JSON.stringify(embeddings));
+          console.log(`[EMBEDDINGS] ${Object.keys(embeddings).length}/${policyTexts.length}`);
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      await env.CACHE.put("embeddings_generated_at", String(Date.now()));
+      console.log(`[EMBEDDINGS] 完成: ${Object.keys(embeddings).length} 条`);
+    } catch (e) {
+      console.error("[EMBEDDINGS] 生成失败:", e);
+    }
+  }
