@@ -98,7 +98,7 @@ def parse_news(html: str, limit: int):
     """
     date_pat = re.compile(r"(\d{4})年(\d{2})月(\d{2})日")
     time_pat = re.compile(r"^(\d{2}):(\d{2})$")
-    title_pat = re.compile(r"^(IPO|投融资|人事变更|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|商业合作|其他动态)\s*\|\s*(.+)$")
+    title_pat = re.compile(r"^(IPO|投融资|人事|新增企业|政策|收并购|产业项目|新品发布|出海|业绩发布|其他动态)\s*\|\s*(.+)$")
 
     lines = html.split("\n")
     items = []

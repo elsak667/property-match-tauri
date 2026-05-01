@@ -3,10 +3,6 @@ main = "src/index.ts"
 compatibility_date = "2025-01-09"
 workers_dev = true
 
-[[kv_namespaces]]
-binding = "CACHE"
-id = "778e6e44328545219e8a72cc1dac98b8"
-
 [vars]
 PROPERTY_SHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg"
 PROPERTY_BUILDING_SHEET_ID = "4hdJSh"
@@ -15,9 +11,3 @@ POLICY_SHEET_ID = "0aad30"
 STATS_SHEET_ID = "2pLPm8"
 NEWS_SHEET = "JtEFsWqVRhPyPetC7Jyc19Oongt"
 NEWS_SHEET_ID = "b6daf2"
-PROPERTY_PARK_SHEET_ID = "4hdJSg"
-PROPERTY_UNIT_SHEET_ID = "4hdJSi"
-PROPERTY_INDUSTRY_SHEET_ID = "4hdJSj"
-
-[triggers]
-crons = ["*/30 * * * *"]
