@@ -190,19 +190,32 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     setShowFilter(true);
   }
 
+  // 楼栋搜索
+  const [nameQuery, setNameQuery] = useState("");
+
   // 筛选结果
   const resultUnits = filtered?.results ?? [];
-  const totalCount = filtered?.total ?? 0;
 
   // 按楼栋去重并分组（基于 building_id）
   const bldMap = new Map<string, PropertyFilterResult["results"][number]>();
   resultUnits.forEach(u => {
     if (!bldMap.has(u.building_id)) bldMap.set(u.building_id, u);
   });
-  const bldList = Array.from(bldMap.values());
+  let bldList = Array.from(bldMap.values());
+  const uniqueBuildingCount = bldList.length;
+
+  // 搜索过滤（前端即时）
+  if (nameQuery.trim()) {
+    const q = nameQuery.trim().toLowerCase();
+    bldList = bldList.filter(u =>
+      (u.building_name || "").toLowerCase().includes(q) ||
+      (u.industry || "").toLowerCase().includes(q) ||
+      (u.park_name || "").toLowerCase().includes(q)
+    );
+  }
 
   const grouped = bldList.reduce<Record<string, typeof bldList>>((acc, u) => {
-    const key = u.park_name || u.district || "其他";
+    const key = u.park_name || "其他";
     if (!acc[key]) acc[key] = [];
     acc[key].push(u);
     return acc;
@@ -239,8 +252,12 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
               className="cp-search-input"
               type="text"
               placeholder="搜索楼栋、产业、园区..."
-              onChange={() => {}}
+              value={nameQuery}
+              onChange={e => setNameQuery(e.target.value)}
             />
+            {nameQuery && (
+              <button className="cp-search-clear" onClick={() => setNameQuery("")}>✕</button>
+            )}
           </div>
           <button
             className={"cp-filter-btn" + (showFilter ? " active" : "")}
@@ -397,7 +414,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {/* 工具栏 */}
         <div className="cp-toolbar">
           <span className="cp-count">
-            {filtering ? "筛选中..." : <><strong>{totalCount}</strong> 栋 / {allBuildings.length} 栋</>}
+            {filtering ? "筛选中..." : <><strong>{uniqueBuildingCount}</strong> 栋 / {allBuildings.length} 栋</>}
           </span>
           <div className="cp-toolbar-right">
             {compareIds.size >= 2 && (

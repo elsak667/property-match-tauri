@@ -40,6 +40,10 @@ const PARK_COORDS: Record<string, [number, number]> = {
   PARK001: [31.2437, 121.6107],
   PARK002: [31.2405, 121.6080],
 };
+const PARK_NAME_MAP: Record<string, string> = {
+  PARK001: "浦发上城科创智谷",
+  PARK002: "金桥地铁上盖J9B-14地块",
+};
 const MAP_CENTER: [number, number] = [31.242, 121.609];
 
 const OFFSET_SCALE = 0.003;
@@ -240,7 +244,7 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
     const blds = buildings.filter(b => b.park_id === pid);
     const vacant = blds.reduce((s, b) => s + (b.area_vacant || 0), 0);
     const park = parks.find(p => p.park_id === pid);
-    return { pid, name: park?.name || pid, blds, vacant };
+    return { pid, name: park?.name || PARK_NAME_MAP[pid] || pid, blds, vacant };
   });
 
   return (
