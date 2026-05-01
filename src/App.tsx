@@ -112,10 +112,6 @@ interface NavBarProps {
 function NavBar({ currentPage, onNavigate }: NavBarProps) {
   return (
     <div className="navbar">
-      <div className="navbar-brand">
-        <span className="navbar-logo">{Icon.logo()}</span>
-        <span className="navbar-title">浦发集团<span>招商平台</span></span>
-      </div>
       <nav className="navbar-tabs" role="tablist" aria-label="主导航">
         {NAV_ITEMS.map(item => (
           <button
