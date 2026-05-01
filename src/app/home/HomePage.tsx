@@ -3,6 +3,7 @@
  */
 import NewsTicker from "../../components/NewsTicker";
 import AIAssistant from "../../components/AIAssistant";
+import { Icon } from "../../components/Icons";
 
 declare global {
   interface Window {
@@ -76,9 +77,9 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
   return (
     <div className="container">
       {/* Banner */}
-      <div className="home-banner">
+      <div className="home-banner anim-banner">
         <div className="banner-left">
-          <div className="banner-badge">🚫 内部使用</div>
+          <div className="banner-badge"><Icon.zapAccent /> 内部使用</div>
           <h1 className="banner-title">浦发集团招商平台</h1>
           <p className="banner-subtitle">
             整合物业载体资源与政策信息，赋能一线招商团队
@@ -111,9 +112,9 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
       <AIAssistant />
 
       {/* 产业快讯 + 模块卡片 */}
-      <div className="home-modules">
+      <div className="home-modules anim-modules">
         {/* 左侧：产业快讯 */}
-        <NewsTicker news={news} />
+        <div className="anim-ticker"><NewsTicker news={news} /></div>
 
         {/* 政策匹配 + 招商管理 */}
         <div className="module-grid">
@@ -121,7 +122,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             className="module-card module-active"
             onClick={() => window.__setPage__?.("policy")}
           >
-            <div className="module-icon">📋</div>
+            <div className="module-icon"><Icon.scrollTextAccent /></div>
             <div className="module-info">
               <div className="module-name">政策智能匹配</div>
               <div className="module-version">v1.0 已上线</div>
@@ -135,14 +136,14 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
               <span className="module-tag">多维筛选</span>
               <span className="module-tag">PDF导出</span>
             </div>
-            <div className="module-enter">进入 →</div>
+            <div className="module-enter">进入 <Icon.arrowRightAccent /></div>
           </div>
 
           <div
             className="module-card module-placeholder"
             onClick={() => window.__setPage__?.("placeholder-invest")}
           >
-            <div className="module-icon">📊</div>
+            <div className="module-icon"><Icon.chartAccent /></div>
             <div className="module-info">
               <div className="module-name">招商管理</div>
               <div className="module-version">待开发</div>
@@ -165,7 +166,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             className="module-card module-active"
             onClick={() => window.__setPage__?.("property")}
           >
-            <div className="module-icon">🏢</div>
+            <div className="module-icon"><Icon.buildingAccent /></div>
             <div className="module-info">
               <div className="module-name">物业载体匹配</div>
               <div className="module-version">v2.0 已上线</div>
@@ -178,14 +179,14 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
               <span className="module-tag">多维筛选</span>
               <span className="module-tag">参数推荐</span>
             </div>
-            <div className="module-enter">进入 →</div>
+            <div className="module-enter">进入 <Icon.arrowRightAccent /></div>
           </div>
 
           <div
             className="module-card module-placeholder"
             onClick={() => window.__setPage__?.("placeholder-industry")}
           >
-            <div className="module-icon">🗺️</div>
+            <div className="module-icon"><Icon.industry /></div>
             <div className="module-info">
               <div className="module-name">产业图谱</div>
               <div className="module-version">待开发</div>
@@ -204,18 +205,18 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
       </div>
 
       {/* 平台介绍 */}
-      <div className="home-section">
+      <div className="home-section anim-section">
         <h2 className="section-title">关于本平台</h2>
         <div className="about-grid">
           <div className="about-card">
-            <div className="about-icon">🎯</div>
+            <div className="about-icon"><Icon.target /></div>
             <div className="about-title">定位</div>
             <div className="about-text">
               面向浦发集团招商部门一线团队内部使用的信息检索与匹配工具，整合物业载体与政策信息，提升招商对接效率。
             </div>
           </div>
           <div className="about-card">
-            <div className="about-icon">⚙️</div>
+            <div className="about-icon"><Icon.settings /></div>
             <div className="about-title">技术架构</div>
             <div className="about-text">
               网页端 React 18 + Vite，AI 代理基于 Cloudflare Workers（NVIDIA Llama
@@ -223,7 +224,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             </div>
           </div>
           <div className="about-card">
-            <div className="about-icon">📡</div>
+            <div className="about-icon"><Icon.industry /></div>
             <div className="about-title">数据来源</div>
             <div className="about-text">
               政策数据来源于政府公开信息，物业数据来源于飞书表格，匹配结果仅供参考，不构成正式建议。
@@ -233,7 +234,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
       </div>
 
       {/* 更新日志 */}
-      <div className="home-section">
+      <div className="home-section anim-section">
         <h2 className="section-title">更新日志</h2>
         <div className="changelog-timeline">
           <div className="timeline-line" />
@@ -253,7 +254,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
       </div>
 
       {/* 底部说明 */}
-      <div className="footer-banner">
+      <div className="footer-banner anim-footer">
         <div className="footer-warning">
           ⚠️ 本系统为内部测试工具，载体及政策信息仅供参考，不构成正式租赁建议或政策承诺。
         </div>

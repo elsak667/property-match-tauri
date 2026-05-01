@@ -5,12 +5,12 @@ import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
 import Feedback from "./components/Feedback";
 import AIAssistant from "./components/AIAssistant";
+import { Icon } from "./components/Icons";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
 
 type Page = "home" | "policy" | "property" | "placeholder-invest" | "placeholder-industry";
 
-// AI 搜索结果共享类型（与 AIAssistant.tsx 保持一致）
 interface AiPropertyMatch {
   id: number;
   name: string;
@@ -28,7 +28,6 @@ interface AiSearchResult {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
-  // AI 搜索结果：提升到 App 层，供 CarrierPage（地图）使用
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
   const [aiActiveBuildingId, setAiActiveBuildingId] = useState<string | null>(null);
   const { policies } = usePolicies();
@@ -39,7 +38,7 @@ export default function App() {
 
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
-      if (["home", "property", "policy", "placeholder-invest", "placeholder-industry"].includes(page)) {
+      if (["home", "policy", "property", "placeholder-invest", "placeholder-industry"].includes(page)) {
         setCurrentPage(page as Page);
       }
     };
@@ -48,7 +47,7 @@ export default function App() {
 
   return (
     <div className="app-wrapper">
-      <div className="app-main">
+      <div className="app-main anim-navbar">
         <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
         <div className="container">
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
@@ -98,11 +97,11 @@ export default function App() {
 }
 
 const NAV_ITEMS = [
-  { key: "home" as const, label: "首页", icon: "🏠" },
-  { key: "policy" as const, label: "政策匹配", icon: "📋" },
-  { key: "property" as const, label: "物业载体", icon: "🏢" },
-  { key: "placeholder-invest" as const, label: "招商管理", icon: "📊" },
-  { key: "placeholder-industry" as const, label: "产业图谱", icon: "🗺️" },
+  { key: "home" as const, label: "首页", IconComp: Icon.home },
+  { key: "policy" as const, label: "政策匹配", IconComp: Icon.policy },
+  { key: "property" as const, label: "物业载体", IconComp: Icon.property },
+  { key: "placeholder-invest" as const, label: "招商管理", IconComp: Icon.chart },
+  { key: "placeholder-industry" as const, label: "产业图谱", IconComp: Icon.industry },
 ] as const;
 
 interface NavBarProps {
@@ -114,7 +113,7 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
   return (
     <div className="navbar">
       <div className="navbar-brand">
-        <span className="navbar-logo">🚀</span>
+        <span className="navbar-logo">{Icon.logo()}</span>
         <span className="navbar-title">浦发集团<span>招商平台</span></span>
       </div>
       <nav className="navbar-tabs" role="tablist" aria-label="主导航">
@@ -126,13 +125,13 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
             className={"navbar-tab" + (currentPage === item.key ? " active" : "")}
             onClick={() => onNavigate(item.key)}
           >
-            <span className="tab-icon">{item.icon}</span>
+            <span className="tab-icon">{item.IconComp()}</span>
             <span className="tab-label">{item.label}</span>
           </button>
         ))}
       </nav>
       <div className="navbar-right">
-        <span className="navbar-badge">🚫 内部使用</span>
+        <span className="navbar-badge"><Icon.zapAccent /> 内部使用</span>
       </div>
     </div>
   );
@@ -148,7 +147,7 @@ function MobileTabBar({ currentPage, onNavigate }: NavBarProps) {
           onClick={() => onNavigate(item.key)}
           aria-label={item.label}
         >
-          <span className="mobile-tab-icon">{item.icon}</span>
+          <span className="mobile-tab-icon">{item.IconComp()}</span>
           <span className="mobile-tab-label">{item.label}</span>
         </button>
       ))}

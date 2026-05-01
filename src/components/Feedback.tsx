@@ -2,6 +2,7 @@
  * 问题反馈 — 浮窗气泡模式（钉钉推送）
  */
 import { useState, useCallback, useEffect, useRef } from "react";
+import { Icon } from "./Icons";
 
 const BASE = "https://api.elsak.eu.org/api";
 
@@ -76,7 +77,7 @@ export default function Feedback() {
   return (
     <>
       <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
-        <span className="ai-fab-icon">{open ? "✕" : "💬"}</span>
+        <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.messageAccent />}</span>
       </button>
 
       {open && (
@@ -84,12 +85,12 @@ export default function Feedback() {
           <div className="ai-panel-header">
             <span>💬</span>
             <span className="ai-panel-title">意见反馈</span>
-            <button className="ai-panel-close" onClick={() => setOpen(false)}>✕</button>
+            <button className="ai-panel-close" onClick={() => setOpen(false)}><Icon.closeSm /></button>
           </div>
 
           {success ? (
             <div className="ai-panel-body" style={{ textAlign: "center", padding: "24px" }}>
-              <div style={{ fontSize: "40px" }}>✅</div>
+              <div style={{ fontSize: 40 }}>{Icon.checkCircleGreen()}</div>
               <p style={{ margin: "12px 0 0", color: "#3b6db5", fontWeight: 600 }}>已收到，感谢反馈！</p>
             </div>
           ) : (
@@ -128,7 +129,7 @@ export default function Feedback() {
                         className="feedback-image-remove"
                         onClick={() => setScreenshot("")}
                         disabled={loading}
-                      >✕</button>
+                      ><Icon.closeSm /></button>
                     </div>
                   ) : null}
                   <label className={`feedback-image-upload${uploadingImg ? " disabled" : ""}`}>
@@ -154,7 +155,7 @@ export default function Feedback() {
                 />
               </div>
 
-              {error && <div className="ai-panel-error">⚠️ {error}</div>}
+              {error && <div className="ai-panel-error"><Icon.alertAccent /> {error}</div>}
 
               <div style={{ padding: "0 16px 16px" }}>
                 <button

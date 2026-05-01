@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Icon } from "./Icons";
 
 interface Building {
   building_id?: string;
@@ -147,7 +148,7 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
     info.onAdd = () => {
       const div = L.DomUtil.create("div");
       let html = `<div style="background:white;padding:10px 14px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18);min-width:160px;font-size:12px;font-family:PingFang SC,sans-serif">`;
-      html += `<div style="font-weight:700;margin-bottom:6px">🏢 园区概览</div>`;
+      html += `<div style="font-weight:700;margin-bottom:6px"><span style="color:var(--accent)">⬡</span> 园区概览</div>`;
       Object.entries(parkStats).forEach(([_pid, p]) => {
         html += `<div style="margin:3px 0;color:#333">${p.name}</div>`;
         html += `<div style="color:#888;font-size:11px;padding-left:8px">${p.count}栋 · 空置${p.vacant.toLocaleString()}㎡</div>`;
@@ -204,8 +205,8 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
         if (onSelect && b.building_id) onSelect(b.building_id);
       });
       marker.bindPopup(`<div style="font-family:PingFang SC,sans-serif;min-width:150px">
-        ${isAiMatched ? `<div style="background:#3b6db5;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px 4px 0 0;margin:-10px -10px 8px -10px">🤖 AI 匹配</div>` : ""}
-        <div style="font-weight:700;font-size:14px;margin-bottom:4px;border-bottom:1px solid #eee;padding-bottom:6px">🏢 ${name}</div>
+        ${isAiMatched ? `<div style="background:#00c8f0;color:#080f1e;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px 4px 0 0;margin:-10px -10px 8px -10px">AI 匹配</div>` : ""}
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px;border-bottom:1px solid #eee;padding-bottom:6px">⬡ ${name}</div>
         <div style="color:#888;font-size:11px;margin-bottom:4px">${parkName}</div>
         <div style="font-size:12px;line-height:1.8">
           <div><span style="color:#888">层数：</span><b>${floors != null ? `${floors}F` : "—"}</b></div>
@@ -261,7 +262,7 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
           alignItems: "center",
           gap: 10,
         }}>
-          <span style={{ fontSize: 18 }}>🤖</span>
+          <span style={{ fontSize: 18 }}><Icon.sparklesAccent /></span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "#1e40af" }}>
               AI 智能匹配 · {aiBuildingIds.size} 栋楼匹配
@@ -316,10 +317,10 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
         }}>
           <div>
             {aiBuildingIds?.has(selectedBld.building_id ?? "") && (
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#3b6db5", background: "#eef2ff", padding: "1px 8px", borderRadius: 10, display: "inline-block", marginBottom: 4 }}>🤖 AI 匹配</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#00c8f0", background: "#f0faff", padding: "1px 8px", borderRadius: 10, display: "inline-block", marginBottom: 4 }}>AI 匹配</div>
             )}
             <div style={{ fontSize: 15, fontWeight: 700 }}>
-              🏢 {selectedBld.name || selectedBld.building_id}
+              <Icon.buildingAccent /> {selectedBld.name || selectedBld.building_id}
             </div>
             <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
               {selectedBld.park_name || selectedBld.park_id}
@@ -341,7 +342,7 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 6 }}>
-        <span>📍 基于 OpenStreetMap · 点击圆点标记查看详情</span>
+        <span>基于 OpenStreetMap · 点击圆点标记查看详情</span>
         <span>共 {filteredBuildings.length} 栋 · 空置 {totalVacant.toLocaleString()}㎡</span>
       </div>
     </div>

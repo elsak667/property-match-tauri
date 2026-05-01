@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from "react";
 import L from "leaflet";
 import { fetchBuildingDetail, type BuildingDetail } from "../lib/workers";
+import { Icon } from "./Icons";
 
 // 园区中心坐标（与 PropertyMap.ts 保持一致）
 const PARK_COORDS: Record<string, [number, number]> = {
@@ -95,17 +96,17 @@ export default function BuildingDetailPanel({ buildingId, onClose }: Props) {
         {/* 头部 */}
         <div className="bdp-header">
           <div className="bdp-header-info">
-            <div className="bdp-title">🏢 {b?.name || buildingId}</div>
+            <div className="bdp-title"><Icon.buildingAccent /> {b?.name || buildingId}</div>
             <div className="bdp-subtitle">
               {b?.park_name} · {b?.district}
               {b?.industry && ` · ${b.industry}`}
             </div>
           </div>
-          <button className="bdp-close" onClick={onClose}>✕</button>
+          <button className="bdp-close" onClick={onClose}><Icon.closeSm /></button>
         </div>
 
         {loading && <div className="bdp-loading"><div className="spinner" />加载中…</div>}
-        {error && <div className="bdp-error">⚠️ {error}</div>}
+        {error && <div className="bdp-error"><Icon.alertAccent /> {error}</div>}
 
         {detail && (
           <div className="bdp-body">

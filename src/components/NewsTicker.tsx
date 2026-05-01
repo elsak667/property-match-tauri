@@ -3,6 +3,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "./Icons";
 
 interface NewsItem {
   time: string;
@@ -98,7 +99,7 @@ export default function NewsTicker({ news }: Props) {
     return (
       <div className="news-ticker">
         <div className="news-ticker-header">
-          <span>📰</span>
+          <span><Icon.newspaper /></span>
           <span className="news-ticker-label">产业快讯</span>
         </div>
         <span className="news-ticker-empty-text">近一周暂无快讯</span>
@@ -115,7 +116,7 @@ export default function NewsTicker({ news }: Props) {
       onMouseLeave={() => setPaused(false)}
     >
       <div className="news-ticker-header">
-        <span>📰</span>
+        <span><Icon.newspaper /></span>
         <span className="news-ticker-label">产业快讯</span>
       </div>
 
