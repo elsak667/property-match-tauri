@@ -254,7 +254,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   }
 
   return (
-    <div className="cp-root">
+    <div className="cp-root" style={{ display: 'flex', height: 'calc(100vh - 120px)', overflow: 'hidden', background: 'var(--bg-base)' }}>
       {/* 左侧 */}
       <div className="cp-sidebar">
         {/* 搜索栏 */}
