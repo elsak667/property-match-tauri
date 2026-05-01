@@ -116,3 +116,20 @@ export interface BuildingDetail {
 
 export const fetchBuildingDetail = (buildingId: string) =>
   request<BuildingDetail>(`/building-detail?building_id=${encodeURIComponent(buildingId)}`);
+
+export interface BuildingSummary {
+  building_id: string;
+  name: string;
+  industry: string;
+  lat: number | null;
+  lng: number | null;
+  park_id: string;
+  park_name: string;
+  district: string;
+  floors: number;
+  area_total: number;
+  area_vacant: number;
+  price: number | null;
+}
+
+export const fetchBuildings = () => request<BuildingSummary[]>("/buildings");

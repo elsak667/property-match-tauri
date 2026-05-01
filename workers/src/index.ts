@@ -998,6 +998,41 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return json({ success: true, top_ids: topIds, query: q });
     }
 
+    // /api/buildings — 全量楼栋聚合数据（用于地图展示）
+    if (path === "/api/buildings" && request.method === "GET") {
+      let cache = await getPropertyCache(env);
+      if (!cache) {
+        cache = await refreshPropertyCache(env);
+        await env.CACHE.put(PROPERTY_CACHE_KEY, JSON.stringify(cache), { expirationTtl: CACHE_TTL_SEC + 60 }).catch(() => {});
+      }
+      // 按 building_id 聚合单元
+      const bldMap: Record<string, { building_id: string; name: string; industry: string; lat: number | null; lng: number | null; park_id: string; park_name: string; district: string; units: RawUnitRow[] }> = {};
+      for (const u of cache.units) {
+        const b = cache.buildings[u.building_id];
+        if (!b) continue;
+        if (!bldMap[u.building_id]) {
+          const park = cache.parks[b.park_id];
+          bldMap[u.building_id] = { building_id: u.building_id, name: b.name, industry: b.industry, lat: b.lat, lng: b.lng, park_id: b.park_id, park_name: park?.name || "", district: park?.district || "", units: [] };
+        }
+        bldMap[u.building_id].units.push(u);
+      }
+      const results = Object.values(bldMap).map(b => ({
+        building_id: b.building_id,
+        name: b.name,
+        industry: b.industry,
+        lat: b.lat,
+        lng: b.lng,
+        park_id: b.park_id,
+        park_name: b.park_name,
+        district: b.district,
+        floors: b.units.length,
+        area_total: b.units.reduce((s, u) => s + (u.area_total ?? 0), 0),
+        area_vacant: b.units.reduce((s, u) => s + (u.area_vacant ?? 0), 0),
+        price: b.units[0]?.price ?? null,
+      }));
+      return json(results);
+    }
+
     // /api/properties?type=园区|楼宇|单元|产业字典
     if (path === "/api/properties" && request.method === "GET") {
       const type = url.searchParams.get("type") || "单元";
