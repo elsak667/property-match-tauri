@@ -644,13 +644,58 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-3);
-  padding: 8px 0;
+  padding: 6px 0 2px;
 }
 .footer-sep { color: var(--border-hi); }
+.footer-disclaimer { color: var(--text-3); font-size: 9px; max-width: 520px; text-align: center; line-height: 1.5; }
 
-/* ─── Home Main Modules ─── */
+/* ─── Home Body: Left News + Right Modules ─── */
+.home-body {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+  height: calc(100vh - 340px);
+}
+
+/* ─── News Panel (Left) ─── */
+.home-news-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.news-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.news-panel-icon { color: var(--primary); }
+.news-panel-label { font-size: 13px; font-weight: 800; color: var(--primary); letter-spacing: 1px; text-transform: uppercase; }
+.news-panel-count { font-size: 10px; color: var(--text-3); margin-left: auto; }
+.news-panel-list { display: flex; flex-direction: column; gap: 6px; overflow-y: scroll; height: 400px; }
+.news-panel-item { display: flex; align-items: center; gap: 7px; padding: 7px 8px; background: var(--bg-base); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.news-panel-item:hover { border-color: rgba(45,106,79,.3); background: rgba(45,106,79,.05); }
+.news-panel-cat { font-size: 9px; font-weight: 700; color: #fff; padding: 2px 6px; border-radius: 3px; flex-shrink: 0; }
+.news-panel-time { font-size: 9px; color: var(--text-3); flex-shrink: 0; }
+.news-panel-title-wrap { flex: 1; overflow: hidden; min-width: 0; display: flex; align-items: center; }
+.news-panel-title { font-size: 11px; color: var(--text-2); font-weight: 500; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; }
+.news-panel-item:hover .news-panel-title { color: var(--primary); }
+
+/* ─── Right Modules Stack ─── */
+.home-right-modules { display: flex; flex-direction: column; gap: 14px; }
+.home-main-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.home-sub-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .home-main-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .home-module-block {
   background: var(--bg-surface); border: 1px solid var(--border);
@@ -686,8 +731,43 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
 .block-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .block-tag { font-size: 10px; font-weight: 600; background: rgba(45,106,79,.1); color: var(--primary); padding: 3px 8px; border-radius: 4px; }
 .block-tag-warn { background: rgba(245,158,11,.1); color: var(--warn); }
-.block-cta { font-size: 12px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 4px; letter-spacing: .3px; }
-.block-status { font-size: 10px; font-weight: 600; background: rgba(245,158,11,.12); color: var(--warn); padding: 3px 8px; border-radius: 4px; }
+.block-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, var(--primary), #3d9970);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: .5px;
+  box-shadow: 0 2px 8px rgba(45,106,79,.25);
+  transition: all .2s ease;
+}
+.block-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(45,106,79,.35);
+}
+.block-building {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.building-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.8); }
+}
+.building-label { font-size: 10px; font-weight: 700; color: var(--primary); letter-spacing: .5px; }
 
 /* ─── Home Sub Modules ─── */
 .home-sub-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }

@@ -194,21 +194,10 @@ def main():
         print("没有新增内容，退出")
         return
 
-    # 只保留最近7天的新闻
-    cutoff = datetime.date.today() - datetime.timedelta(days=7)
-    date_pat = re.compile(r"(\d{4})/(\d{2})/(\d{2})")
-    filtered = []
-    for n in new_items:
-        m = date_pat.match(n["time"].split(" ")[0])
-        if m:
-            item_date = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            if item_date >= cutoff:
-                filtered.append(n)
-    print(f"最近7天: {len(filtered)} 条（已过滤 {len(new_items) - len(filtered)} 条旧数据）")
-    new_items = filtered
+    print(f"新增 {len(new_items)} 条（不过滤日期）")
 
     if not new_items:
-        print('没有新增内容，退出')
+        print("没有新增内容，退出")
         return
 
     if args.dry_run:

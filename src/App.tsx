@@ -49,7 +49,7 @@ export default function App() {
     <div className="app-wrapper">
       <div className="app-main anim-navbar">
         <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-        <div className="container">
+        <div>
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
           {currentPage === "property" && (
