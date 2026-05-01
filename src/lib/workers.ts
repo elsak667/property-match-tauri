@@ -52,3 +52,84 @@ export const fetchPoliciesFromWorkers = () => request<SheetData>("/policies");
 export const getWorkersPolicyStats = () => request<PolicyStats>("/property-stats");
 export const fetchPropertySheet = (type: string) =>
   request<Record<string, unknown>[]>(`/properties?type=${encodeURIComponent(type)}`);
+
+export interface PropertyFilterResult {
+  total: number;
+  page: number;
+  page_size: number;
+  results: PropertyFilterUnit[];
+}
+
+export interface PropertyFilterUnit {
+  unit_id: string;
+  building_id: string;
+  park_id: string;
+  unit_no: string;
+  floor: number | null;
+  area_total: number | null;
+  area_vacant: number | null;
+  price: number | null;
+  floor_height: number | null;
+  load: number | null;
+  building_name: string;
+  building_industry: string;
+  building_lat: number | null;
+  building_lng: number | null;
+  park_name: string;
+  district: string;
+  industry: string;
+  remark: string;
+}
+
+export const filterProperties = (params: Record<string, string | number | undefined>) => {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join("&");
+  return request<PropertyFilterResult>(`/property-filter${qs ? "?" + qs : ""}`);
+};
+
+export interface BuildingDetail {
+  building: {
+    building_id: string;
+    name: string;
+    industry: string;
+    has_crane_beam: boolean;
+    lat: number | null;
+    lng: number | null;
+    park_id: string;
+    park_name: string;
+    district: string;
+  };
+  units: {
+    unit_id: string;
+    unit_no: string;
+    floor: number | null;
+    area_total: number | null;
+    area_vacant: number | null;
+    price: number | null;
+    floor_height: number | null;
+    load: number | null;
+    remark: string;
+  }[];
+}
+
+export const fetchBuildingDetail = (buildingId: string) =>
+  request<BuildingDetail>(`/building-detail?building_id=${encodeURIComponent(buildingId)}`);
+
+export interface BuildingSummary {
+  building_id: string;
+  name: string;
+  industry: string;
+  lat: number | null;
+  lng: number | null;
+  park_id: string;
+  park_name: string;
+  district: string;
+  floors: number;
+  area_total: number;
+  area_vacant: number;
+  price: number | null;
+}
+
+export const fetchBuildings = () => request<BuildingSummary[]>("/buildings");
