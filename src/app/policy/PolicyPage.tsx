@@ -3,6 +3,7 @@ import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
 import { getPolicyStats } from "../../lib/tauri";
+import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
 
 function stripHtml(text: string): string {
@@ -54,8 +55,8 @@ function PolicyCard({
           <div className="result-name">{item.stars} {name}</div>
         </div>
         <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-          {isUrgent && <span className="hot-badge">🔥 即将截止</span>}
-          {item.expired && <span className="expired-badge">已过期</span>}
+          {isUrgent && <span className="hot-badge"><Icon.zapAccent /> 即将截止</span>}
+          {item.expired && <span className="expired-badge"><Icon.xCircle /> 已过期</span>}
           <button className="expand-hint" onClick={() => onToggleExpand(name)} aria-expanded={isExpanded}>
             {isExpanded ? "收起 ▲" : "展开 ▼"}
           </button>
@@ -63,13 +64,13 @@ function PolicyCard({
       </div>
       <div className="result-meta compact">
         <span className="meta-main">
-          {item.amount_s ? item.amount_s === "待定" ? "💰 待定" : /万|元/.test(item.amount_s) ? `💰 ${item.amount_s}` : `💰 ${item.amount_s}万元` : "—"}
+          {item.amount_s ? item.amount_s === "待定" ? <><Icon.lightbulb /> 待定</> : /万|元/.test(item.amount_s) ? <><Icon.lightbulb /> {item.amount_s}</> : <><Icon.lightbulb /> {item.amount_s}万元</> : "—"}
         </span>
-        {item.industry && <span>🏭 {item.industry}</span>}
-        {item.subject && <span>👥 {item.subject}</span>}
-        {item.cap && <span>💡 {item.cap}</span>}
+        {item.industry && <span><Icon.industry /> {item.industry}</span>}
+        {item.subject && <span><Icon.users /> {item.subject}</span>}
+        {item.cap && <span><Icon.lightbulb /> {item.cap}</span>}
         <span className={`meta-date${isUrgent ? " urgent" : ""}`}>
-          {item.end_date ? `📅 ${item.end_date.substring(0, 10)}` : "📅 长期有效"}
+          {item.end_date ? <><Icon.calendarDays /> {item.end_date.substring(0, 10)}</> : <><Icon.calendarDays /> 长期有效</>}
           {daysLeft > 0 && daysLeft < 365 && !item.expired && ` (${daysLeft}天)`}
         </span>
       </div>
@@ -256,16 +257,16 @@ export default function PolicyPage() {
     <div className="container">
       {toast.type !== "idle" && (
         <div className={`toast toast-${toast.type}`} role="alert">
-          {toast.type === "success" && "✅ "}
-          {toast.type === "error" && "❌ "}
-          {toast.type === "info" && "ℹ️ "}
+          {toast.type === "success" && <Icon.checkCircle />}
+          {toast.type === "error" && <Icon.xCircle />}
+          {toast.type === "info" && <Icon.info />}
           {toast.message}
         </div>
       )}
 
       {stats && (
         <div className="stats-bar">
-          <span className="stats-bar-label">📊 数据对比</span>
+          <span className="stats-bar-label"><Icon.chartAccent /> 数据对比</span>
           <div className="stats-items">
             <div className="stats-item"><span className="stats-item-num">{stats.local数据库}</span><span className="stats-item-label">本地政策</span></div>
             <div className="stats-divider" />
@@ -282,7 +283,7 @@ export default function PolicyPage() {
       <div className="main-layout">
         <aside className="sidebar">
           <div className="filter-section">
-            <div className="filter-label">🔍 关键词搜索</div>
+            <div className="filter-label"><Icon.searchMuted /> 关键词搜索</div>
             <input
               id="query-input"
               type="text"
@@ -300,7 +301,7 @@ export default function PolicyPage() {
 
           {options.locations.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">📍 适用区域</div>
+              <div className="filter-label"><Icon.mapPinAccent /> 适用区域</div>
               <div className="tag-grid">
                 {options.locations.map(loc => (
                   <button
@@ -317,7 +318,7 @@ export default function PolicyPage() {
 
           {options.industries.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">🏭 产业方向</div>
+              <div className="filter-label"><Icon.industry /> 产业方向</div>
               <div className="tag-grid">
                 {options.industries.map(ind => (
                   <button
@@ -334,7 +335,7 @@ export default function PolicyPage() {
 
           {options.depts.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">🏛️ 发布单位</div>
+              <div className="filter-label"><Icon.buildingMuted /> 发布单位</div>
               <select
                 className="filter-select"
                 value={dept}
@@ -349,7 +350,7 @@ export default function PolicyPage() {
 
           {options.caps.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">💡 政策能力</div>
+              <div className="filter-label"><Icon.zap /> 政策能力</div>
               <div className="tag-grid">
                 {options.caps.map(c => (
                   <button
@@ -383,7 +384,7 @@ export default function PolicyPage() {
               }
             </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              共 {policies.length} 条 · {fromFeishu ? "📡 飞书数据" : "📋 Mock数据"}
+              共 {policies.length} 条 · {fromFeishu ? "飞书数据" : "Mock数据"}
             </div>
             <div className="legend">
               {results.length > 5 && (
@@ -429,7 +430,7 @@ export default function PolicyPage() {
               </div>
             ) : results.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon"><Icon.file /></div>
                 <p>未找到匹配政策</p>
                 <small>试试调整筛选条件</small>
                 {hasFilters && (
@@ -457,14 +458,14 @@ export default function PolicyPage() {
               {!showExport && (
                 <button className="btn-primary" onClick={() => setShowExport(true)}>📥 导出/打印政策</button>
               )}
-              <button className="btn-secondary" onClick={doMatch}>🔄 重新匹配</button>
+              <button className="btn-secondary" onClick={doMatch}><Icon.refreshAccent /> 重新匹配</button>
             </div>
           )}
         </main>
       </div>
 
       <div className="footer-banner">
-        <div className="footer-warning">⚠️ 本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</div>
+        <div className="footer-warning"><Icon.alertWhite /> 本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</div>
         <div className="footer-credit">浦发集团招商中心 · 仅供内部使用 · 技术支持：Els.J</div>
       </div>
     </div>

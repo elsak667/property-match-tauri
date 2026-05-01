@@ -4,6 +4,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { openPrintHtmlRaw } from "../lib/pdfgen_new";
 import BuildingDetailPanel from "./BuildingDetailPanel";
+import { Icon } from "./Icons";
 
 // RAG API 返回类型
 interface AiPolicyMatch {
@@ -128,7 +129,7 @@ ${propTable}
     <>
       {/* 浮窗气泡按钮 */}
       <button className="ai-fab ai-fab-ai" onClick={() => setOpen(!open)} aria-label="AI助手">
-        <span className="ai-fab-icon">{open ? "✕" : "🤖"}</span>
+        <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.botAccent />}</span>
         {total > 0 && !open && <span className="ai-fab-dot" />}
       </button>
 
@@ -136,9 +137,9 @@ ${propTable}
       {open && (
         <div className="ai-panel ai-panel-ai" ref={panelRef}>
           <div className="ai-panel-header">
-            <span>🤖</span>
+            <span><Icon.botAccent /></span>
             <span className="ai-panel-title">AI 智能匹配</span>
-            <button className="ai-panel-close" onClick={() => setOpen(false)}>✕</button>
+            <button className="ai-panel-close" onClick={() => setOpen(false)}><Icon.closeSm /></button>
           </div>
 
           <div className="ai-panel-search">
@@ -152,7 +153,7 @@ ${propTable}
               disabled={loading}
             />
             <button className="ai-panel-btn" onClick={handleSearch} disabled={loading || !query.trim()}>
-              {loading ? "..." : "🔍"}
+              {loading ? <Icon.loader /> : <Icon.search />}
             </button>
           </div>
 
@@ -171,7 +172,7 @@ ${propTable}
             </div>
           )}
 
-          {error && <div className="ai-panel-error">⚠️ {error}</div>}
+          {error && <div className="ai-panel-error"><Icon.alertAccent /> {error}</div>}
 
           {result && (
             <div className="ai-panel-body">
@@ -184,7 +185,7 @@ ${propTable}
                 <span>政策 <strong>{result.policies.length}</strong></span>
                 <span>载体 <strong>{result.properties.length}</strong></span>
                 {total > 0 && (
-                  <button className="ai-panel-export" onClick={handleExport}>📄 导出</button>
+                  <button className="ai-panel-export" onClick={handleExport}><Icon.download /> 导出</button>
                 )}
               </div>
 
@@ -203,7 +204,7 @@ ${propTable}
               {result.properties.length > 0 && (
                 <>
                   <div className="ai-panel-divider" />
-                  <div className="ai-panel-section-label">🏢 物业载体</div>
+                  <div className="ai-panel-section-label"><Icon.buildingAccent /> 物业载体</div>
                   {result.properties.map((p, i) => (
                     <div key={i} className="ai-panel-item ai-panel-item-prop" style={{ cursor: "pointer" }} onClick={() => p.building_id && onAiBuildingClick?.(p.building_id)}>
                       <div className="ai-panel-item-name">
@@ -211,7 +212,7 @@ ${propTable}
                         {p.building || p.name}
                       </div>
                       <div className="ai-panel-item-meta">
-                        {p.park && <span>📍 {p.park}</span>}
+                        {p.park && <span><Icon.mapPin /> {p.park}</span>}
                         {p.match_reason}
                         {p.building_id && <span style={{ color: "#3b6db5", marginLeft: 6 }}>查看详情 →</span>}
                       </div>

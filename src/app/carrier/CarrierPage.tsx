@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchBuildings, filterProperties, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
+import { Icon } from "../../components/Icons";
 import PropertyMap from "../../components/PropertyMap";
 import { openPrintHtmlRaw } from "../../lib/pdfgen_new";
 import { INDUSTRY_PROFILES } from "../property/mockData";
@@ -248,7 +249,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   if (error) {
     return (
       <div className="load-error" style={{ margin: "24px auto", maxWidth: 480, textAlign: "center" }}>
-        <strong>⚠️ 数据加载失败</strong><br />{error}
+        <Icon.alertWhite /> 数据加载失败<br />{error}
       </div>
     );
   }
@@ -260,7 +261,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {/* 搜索栏 */}
         <div className="cp-search-bar">
           <div className="cp-search-input-wrap">
-            <span className="cp-search-icon">🔍</span>
+            <span className="cp-search-icon"><Icon.search /></span>
             <input
               className="cp-search-input"
               type="text"
@@ -269,7 +270,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
               onChange={e => setNameQuery(e.target.value)}
             />
             {nameQuery && (
-              <button className="cp-search-clear" onClick={() => setNameQuery("")}>✕</button>
+              <button className="cp-search-clear" onClick={() => setNameQuery("")}><Icon.closeSm /></button>
             )}
           </div>
           <button
@@ -277,7 +278,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             onClick={() => setShowFilter(v => !v)}
             title="更多筛选条件"
           >
-            <span>⚙️</span>
+            <Icon.settingsAccent />
             {activeFilterCount > 0 && <span className="cp-filter-count">{activeFilterCount}</span>}
           </button>
         </div>
@@ -286,7 +287,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {aiTop5.length > 0 && (
           <div className="cp-ai-section">
             <div className="cp-section-label">
-              <span>🤖</span>
+              <Icon.sparklesAccent />
               <span>AI 推荐</span>
               <span className="cp-badge">{aiTop5.length}</span>
             </div>
@@ -301,7 +302,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                     <span>{p.building || p.name}</span>
                     <span className="cp-score">{p.score}</span>
                   </div>
-                  <div className="cp-ai-card-meta">{p.park && `📍 ${p.park}`}</div>
+                  <div className="cp-ai-card-meta">{p.park && <><Icon.mapPinAccent /> {p.park}</>}</div>
                   <div className="cp-ai-card-reason">{p.match_reason}</div>
                 </div>
               ))}
@@ -361,10 +362,10 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                   </div>
                 )}
                 {industryParams.remark && (
-                  <div className="cp-params-remark">💡 {industryParams.remark}</div>
+                  <div className="cp-params-remark"><Icon.lightbulb /> {industryParams.remark}</div>
                 )}
                 <button className="cp-btn-apply" onClick={applyIndustryParams}>
-                  ⭐ 一键填入筛选条件
+                  <Icon.zap /> 一键填入筛选条件
                 </button>
               </div>
             )}
@@ -374,7 +375,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {/* 专业筛选面板 */}
         {showFilter && (
           <div className="cp-filter-panel">
-            <div className="cp-filter-panel-title">🏢 筛选条件</div>
+            <div className="cp-filter-panel-title"><Icon.buildingAccent /> 筛选条件</div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">园区</label>
               <select className="cp-filter-select" value={fPark} onChange={e => setFPark(e.target.value)}>
@@ -458,7 +459,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           <div className="cp-toolbar-right">
             {compareIds.size >= 2 && (
               <button className="cp-btn-compare" onClick={() => setShowCompare(true)}>
-                📊 对比 {compareIds.size}
+                <Icon.chart /> 对比 {compareIds.size}
               </button>
             )}
           </div>
@@ -480,7 +481,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                   <div className="cp-park-header" onClick={() => setCollapsedParks(p => {
                     const n = new Set(p); isCollapsed ? n.delete(parkName) : n.add(parkName); return n;
                   })}>
-                    <span>📍 {parkName} <span className="cp-park-count">({items.length}栋)</span></span>
+                    <span><Icon.mapPinAccent /> {parkName} <span className="cp-park-count">({items.length}栋)</span></span>
                     <span className="cp-collapse-icon">{isCollapsed ? "▶" : "▼"}</span>
                   </div>
                   {!isCollapsed && (
@@ -504,7 +505,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                             <div className="cp-building-info" onClick={() => handleBuildingSelect(b.building_id)}>
                               <div className="cp-building-name">
                                 {b.name}
-                                {isAi && <span className="cp-ai-badge">🤖</span>}
+                                {isAi && <span className="cp-ai-badge"><Icon.sparklesAccent /></span>}
                               </div>
                               <div className="cp-building-tags">
                                 {industry && <span className="cp-tag">{industry}</span>}
@@ -538,7 +539,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         <div className="cp-compare-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCompare(false); }}>
           <div className="cp-compare-panel">
             <div className="cp-compare-header">
-              <span>📊 楼栋对比</span>
+              <span><Icon.chartAccent /> 楼栋对比</span>
               <div className="cp-compare-actions">
                 <button className="cp-btn-export" onClick={() => {
                   const fields: [string, (u: PropertyFilterResult["results"][number]) => string][] = [
@@ -562,8 +563,8 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                     <p style="margin-top:20px;color:#999;font-size:12px">${new Date().toLocaleString("zh-CN")} · 浦发集团招商平台</p>
                   </body></html>`;
                   openPrintHtmlRaw(html);
-                }}>📄 导出</button>
-                <button className="cp-close-btn" onClick={() => setShowCompare(false)}>✕</button>
+                }}><Icon.downloadWhite /> 导出</button>
+                <button className="cp-close-btn" onClick={() => setShowCompare(false)}><Icon.closeSm /> 关闭</button>
               </div>
             </div>
             <div className="cp-compare-body">
