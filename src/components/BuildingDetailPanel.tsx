@@ -118,18 +118,18 @@ export default function BuildingDetailPanel({ buildingId, onClose }: Props) {
             <div className="bdp-stats">
               <div className="bdp-stat">
                 <div className="bdp-stat-num">{units.length}</div>
-                <div className="bdp-stat-label">层</div>
+                <div className="bdp-stat-label">楼层数</div>
               </div>
               <div className="bdp-stat">
                 <div className="bdp-stat-num">{units.reduce((s, u) => s + (u.area_total ?? 0), 0).toLocaleString()}</div>
                 <div className="bdp-stat-label">总面积（㎡）</div>
               </div>
               <div className="bdp-stat">
-                <div className="bdp-stat-num">{units.reduce((s, u) => s + (u.area_vacant ?? 0), 0).toLocaleString()}</div>
+                <div className="bdp-stat-num" style={{ color: "#059669" }}>{units.reduce((s, u) => s + (u.area_vacant ?? 0), 0).toLocaleString()}</div>
                 <div className="bdp-stat-label">空置（㎡）</div>
               </div>
               <div className="bdp-stat">
-                <div className="bdp-stat-num">
+                <div className="bdp-stat-num" style={{ color: "#d97706" }}>
                   {units[0]?.price != null ? `${units[0].price}` : "—"}
                 </div>
                 <div className="bdp-stat-label">元/㎡/天</div>

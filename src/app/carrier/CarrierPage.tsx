@@ -414,7 +414,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {/* 工具栏 */}
         <div className="cp-toolbar">
           <span className="cp-count">
-            {filtering ? "筛选中..." : <><strong>{uniqueBuildingCount}</strong> 栋 / {allBuildings.length} 栋</>}
+            {filtering ? "筛选中..." : <><strong>{uniqueBuildingCount}</strong> 栋楼</>}
           </span>
           <div className="cp-toolbar-right">
             {compareIds.size >= 2 && (
