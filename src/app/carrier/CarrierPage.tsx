@@ -3,19 +3,20 @@
  * - 非专业用户：AI 搜索 + 推荐卡片 + 地图
  * - 专业招商人员：可展开多维筛选面板 + 批量对比
  */
-import { useState, useEffect } from "react";
-import { fetchBuildings, type BuildingSummary } from "../../lib/workers";
+import { useState, useEffect, useCallback } from "react";
+import { fetchBuildings, filterProperties, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
 import PropertyMap from "../../components/PropertyMap";
 import { openPrintHtmlRaw } from "../../lib/pdfgen_new";
 import { INDUSTRY_PROFILES } from "../property/mockData";
+import type { PropertyFilterResult } from "../../lib/workers";
 
 // AI 搜索结果类型
 interface AiPropertyMatch {
   id: number;
+  building_id: string;
   name: string;
   building: string;
-  building_id: string;
   park: string;
   match_reason: string;
   score: number;
@@ -32,111 +33,118 @@ interface Props {
   onAiBuildingClick?: (buildingId: string) => void;
 }
 
-// 楼栋筛选条件（与原 mockData.filterProperties 一致）
-interface FilterOpts {
-  nameQuery: string;
-  type?: string;
-  areaMin?: number;
-  areaMax?: number;
-  priceMax?: number;
-  loadMin?: number;
-  heightMin?: number;
-  powerKVMin?: number;
-  parkId?: string;
-  is104?: string;
-}
+const PARKS: { value: string; label: string }[] = [
+  { value: "", label: "全部园区" },
+  { value: "PARK001", label: "金桥北区" },
+  { value: "PARK002", label: "金桥南区" },
+];
 
-const PARKS: Record<string, string> = { PARK001: "金桥北区", PARK002: "金桥南区" };
+const IS104_OPTIONS = [
+  { value: "", label: "不限" },
+  { value: "是", label: "是" },
+  { value: "否", label: "否" },
+];
 
-// 收集所有产业选项
-const ALL_INDUSTRIES: { category: string; name: string }[] = [];
-INDUSTRY_PROFILES.categories.forEach((cat: { name: string; industries: { name: string }[] }) => {
-  cat.industries.forEach((ind: { name: string }) => {
-    ALL_INDUSTRIES.push({ category: cat.name, name: ind.name });
-  });
-});
-
-function matchIndustryParams(industryName: string): { name: string; loadMin: number | null; heightMin: number | null; powerKV: number | null; dualPower: boolean | null; special: string[]; remark: string } | null {
+// 产业参数匹配
+function matchIndustryParams(name: string) {
   for (const cat of INDUSTRY_PROFILES.categories) {
-    const found = cat.industries.find((ind: { name: string; alias?: string[] }) =>
-      ind.name === industryName ||
-      ind.alias?.some((a: string) => industryName.includes(a))
+    const found = cat.industries.find(ind =>
+      ind.name === name || ind.alias?.some((a: string) => name.includes(a))
     );
-    if (found) return found;
+    if (found) return { category: cat.name, ...found };
   }
   return null;
 }
 
 export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuildingClick }: Props) {
-  const [buildings, setBuildings] = useState<BuildingSummary[]>([]);
+  const [allBuildings, setAllBuildings] = useState<BuildingSummary[]>([]);
+  const [filtered, setFiltered] = useState<PropertyFilterResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filtering, setFiltering] = useState(false);
   const [error, setError] = useState("");
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
 
   // 筛选
-  const [filters, setFilters] = useState<FilterOpts>({ nameQuery: "" });
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [filterCount, setFilterCount] = useState(0);
+  const [fPark, setFPark] = useState("");
+  const [fAreaMin, setFAreaMin] = useState("");
+  const [fAreaMax, setFAreaMax] = useState("");
+  const [fPriceMax, setFPriceMax] = useState("");
+  const [fLoadMin, setFLoadMin] = useState("");
+  const [fHeightMin, setFHeightMin] = useState("");
+  const [fPowerKVMin, setFPowerKVMin] = useState("");
+  const [fIs104, setFIs104] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
 
   // 产业参数建议
-  const [selectedIndustry, setSelectedIndustry] = useState<string>("");
-  const [matchedParams, setMatchedParams] = useState<{
-    name: string;
-    loadMin: number | null;
-    heightMin: number | null;
-    powerKV: number | null;
-    dualPower: boolean | null;
-    special: string[];
-    remark: string;
+  const [fIndustryCat, setFIndustryCat] = useState("");
+  const [fIndustry, setFIndustry] = useState("");
+  const [industryParams, setIndustryParams] = useState<{
+    name: string; loadMin: number | null; heightMin: number | null;
+    powerKV: number | null; dualPower: boolean | null; special: string[]; remark: string
   } | null>(null);
 
-  // 对比模式
+  // 对比
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
 
   // 园区折叠
   const [collapsedParks, setCollapsedParks] = useState<Set<string>>(new Set());
 
+  // 加载全量楼栋
   useEffect(() => {
     fetchBuildings()
-      .then(data => { setBuildings(data ?? []); setLoading(false); })
+      .then(data => { setAllBuildings(data ?? []); setLoading(false); })
       .catch((e: Error) => { setError(e.message); setLoading(false); });
   }, []);
 
-  // AI 匹配楼栋集合
+  // 计数激活筛选条件
+  useEffect(() => {
+    let c = 0;
+    if (fPark) c++;
+    if (fAreaMin) c++;
+    if (fAreaMax) c++;
+    if (fPriceMax) c++;
+    if (fLoadMin) c++;
+    if (fHeightMin) c++;
+    if (fPowerKVMin) c++;
+    if (fIs104) c++;
+    setActiveFilterCount(c);
+  }, [fPark, fAreaMin, fAreaMax, fPriceMax, fLoadMin, fHeightMin, fPowerKVMin, fIs104]);
+
+  // 执行筛选（调用 API）
+  const doFilter = useCallback(async () => {
+    setFiltering(true);
+    try {
+      const result = await filterProperties({
+        park: fPark || undefined,
+        area_min: fAreaMin ? Number(fAreaMin) : undefined,
+        area_max: fAreaMax ? Number(fAreaMax) : undefined,
+        price_max: fPriceMax ? Number(fPriceMax) : undefined,
+        load_min: fLoadMin ? Number(fLoadMin) : undefined,
+        height_min: fHeightMin ? Number(fHeightMin) : undefined,
+        power_kv_min: fPowerKVMin ? Number(fPowerKVMin) : undefined,
+        is104: fIs104 || undefined,
+        page: 1,
+        page_size: 500,
+      });
+      setFiltered(result);
+    } catch {
+      setFiltered(null);
+    } finally {
+      setFiltering(false);
+    }
+  }, [fPark, fAreaMin, fAreaMax, fPriceMax, fLoadMin, fHeightMin, fPowerKVMin, fIs104]);
+
+  // 自动触发筛选（防抖）
+  useEffect(() => {
+    const t = setTimeout(doFilter, 400);
+    return () => clearTimeout(t);
+  }, [doFilter]);
+
+  // AI 匹配楼栋
   const aiBuildingIds = new Set((aiResult?.properties ?? []).map(p => p.building_id).filter(Boolean));
   const aiTop5 = (aiResult?.properties ?? []).slice(0, 5);
-
-  // 筛选
-  function applyFilters(opts: FilterOpts): BuildingSummary[] {
-    return buildings.filter(b => {
-      if (opts.nameQuery) {
-        const q = opts.nameQuery.toLowerCase();
-        const match = !b.name?.toLowerCase().includes(q) &&
-          !b.park_name?.toLowerCase().includes(q) &&
-          !b.industry?.toLowerCase().includes(q);
-        if (match) return false;
-      }
-      if (opts.parkId && b.park_id !== opts.parkId) return false;
-      return true;
-    });
-  }
-
-  const filteredBuildings = applyFilters(filters);
-
-  // 统计激活筛选条件数
-  useEffect(() => {
-    let count = 0;
-    if (filters.nameQuery) count++;
-    if (filters.type) count++;
-    if (filters.areaMin || filters.areaMax) count++;
-    if (filters.priceMax) count++;
-    if (filters.loadMin) count++;
-    if (filters.heightMin) count++;
-    if (filters.powerKVMin) count++;
-    if (filters.is104) count++;
-    setFilterCount(count);
-  }, [filters]);
 
   // 同步 AI 高亮
   useEffect(() => {
@@ -151,52 +159,61 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   function toggleCompare(bldId: string) {
     setCompareIds(prev => {
       const next = new Set(prev);
-      if (next.has(bldId)) next.delete(bldId); else {
-        if (next.size >= 4) return prev;
-        next.add(bldId);
-      }
+      if (next.has(bldId)) next.delete(bldId);
+      else { if (next.size >= 4) return prev; next.add(bldId); }
       return next;
     });
   }
 
+  function resetAll() {
+    setFPark(""); setFAreaMin(""); setFAreaMax(""); setFPriceMax("");
+    setFLoadMin(""); setFHeightMin(""); setFPowerKVMin(""); setFIs104("");
+  }
+
+  function handleIndustryCatChange(cat: string) {
+    setFIndustryCat(cat);
+    setFIndustry("");
+    setIndustryParams(null);
+  }
+
   function handleIndustryChange(name: string) {
-    setSelectedIndustry(name);
-    if (name) {
-      const params = matchIndustryParams(name);
-      setMatchedParams(params);
-    } else {
-      setMatchedParams(null);
-    }
+    setFIndustry(name);
+    if (name) setIndustryParams(matchIndustryParams(name));
+    else setIndustryParams(null);
   }
 
   function applyIndustryParams() {
-    if (!matchedParams) return;
-    const newFilters: FilterOpts = { ...filters };
-    if (matchedParams.loadMin) newFilters.loadMin = matchedParams.loadMin;
-    if (matchedParams.heightMin) newFilters.heightMin = matchedParams.heightMin;
-    if (matchedParams.powerKV) newFilters.powerKVMin = matchedParams.powerKV;
-    setFilters(newFilters);
-    setShowFilterPanel(true);
+    if (!industryParams) return;
+    if (industryParams.loadMin) setFLoadMin(String(industryParams.loadMin));
+    if (industryParams.heightMin) setFHeightMin(String(industryParams.heightMin));
+    if (industryParams.powerKV) setFPowerKVMin(String(industryParams.powerKV));
+    setShowFilter(true);
   }
 
-  function resetFilters() {
-    setFilters({ nameQuery: "" });
-    setFilterCount(0);
-  }
+  // 筛选结果
+  const resultUnits = filtered?.results ?? [];
+  const totalCount = filtered?.total ?? 0;
 
-  // 按园区分组
-  const grouped = filteredBuildings.reduce<Record<string, BuildingSummary[]>>((acc, b) => {
-    const key = b.park_name || b.park_id || "";
+  // 按楼栋去重并分组（基于 building_id）
+  const bldMap = new Map<string, PropertyFilterResult["results"][number]>();
+  resultUnits.forEach(u => {
+    if (!bldMap.has(u.building_id)) bldMap.set(u.building_id, u);
+  });
+  const bldList = Array.from(bldMap.values());
+
+  const grouped = bldList.reduce<Record<string, typeof bldList>>((acc, u) => {
+    const key = u.park_name || u.district || "其他";
     if (!acc[key]) acc[key] = [];
-    acc[key].push(b);
+    acc[key].push(u);
     return acc;
   }, {});
 
-  const compareBuildings = buildings.filter(b => compareIds.has(b.building_id));
+  // 对比数据
+  const compareUnits = resultUnits.filter(u => compareIds.has(u.building_id));
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 400 }}>
         <div className="spinner" />
       </div>
     );
@@ -222,20 +239,16 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
               className="cp-search-input"
               type="text"
               placeholder="搜索楼栋、产业、园区..."
-              value={filters.nameQuery}
-              onChange={e => setFilters(f => ({ ...f, nameQuery: e.target.value }))}
+              onChange={() => {}}
             />
-            {filters.nameQuery && (
-              <button className="cp-search-clear" onClick={() => setFilters(f => ({ ...f, nameQuery: "" }))}>✕</button>
-            )}
           </div>
           <button
-            className={"cp-filter-btn" + (showFilterPanel ? " active" : "")}
-            onClick={() => setShowFilterPanel(v => !v)}
-            title="专业筛选"
+            className={"cp-filter-btn" + (showFilter ? " active" : "")}
+            onClick={() => setShowFilter(v => !v)}
+            title="更多筛选条件"
           >
-            <span style={{ fontSize: 13 }}>⚙️</span>
-            {filterCount > 0 && <span className="cp-filter-count">{filterCount}</span>}
+            <span>⚙️</span>
+            {activeFilterCount > 0 && <span className="cp-filter-count">{activeFilterCount}</span>}
           </button>
         </div>
 
@@ -245,7 +258,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             <div className="cp-section-label">
               <span>🤖</span>
               <span>AI 推荐</span>
-              <span className="cp-badge">Top {aiTop5.length}</span>
+              <span className="cp-badge">{aiTop5.length}</span>
             </div>
             <div className="cp-ai-cards">
               {aiTop5.map(p => (
@@ -254,7 +267,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                   className={"cp-ai-card" + (selectedBuildingId === p.building_id ? " active" : "")}
                   onClick={() => handleBuildingSelect(p.building_id)}
                 >
-                  <div className="cp-ai-card-title">
+                  <div className="cp-ai-card-name">
                     <span>{p.building || p.name}</span>
                     <span className="cp-score">{p.score}</span>
                   </div>
@@ -272,58 +285,53 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             <span>📐</span>
             <span>产业参数建议</span>
           </div>
-          <div className="cp-industry-lookup">
-            <select
-              className="cp-filter-select"
-              value={selectedIndustry}
-              onChange={e => handleIndustryChange(e.target.value)}
-            >
-              <option value="">— 选择产业方向 —</option>
-              {ALL_INDUSTRIES.map(ind => (
-                <option key={ind.name} value={ind.name}>
-                  {ind.name}
-                </option>
-              ))}
-            </select>
-
-            {matchedParams && (
+          <div className="cp-params-wrap">
+            <div className="cp-params-row">
+              <select
+                className="cp-params-select"
+                value={fIndustryCat}
+                onChange={e => handleIndustryCatChange(e.target.value)}
+              >
+                <option value="">— 选择产业大类 —</option>
+                {INDUSTRY_PROFILES.categories.map(cat => (
+                  <option key={cat.code} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            {fIndustryCat && (
+              <div className="cp-params-row">
+                <select
+                  className="cp-params-select"
+                  value={fIndustry}
+                  onChange={e => handleIndustryChange(e.target.value)}
+                >
+                  <option value="">— 选择具体产业 —</option>
+                  {INDUSTRY_PROFILES.categories
+                    .find(c => c.name === fIndustryCat)
+                    ?.industries.map(ind => (
+                      <option key={ind.code} value={ind.name}>{ind.name}</option>
+                    ))}
+                </select>
+              </div>
+            )}
+            {industryParams && (
               <div className="cp-params-card">
-                <div className="cp-params-title">{matchedParams.name}</div>
-                <div className="cp-params-grid">
-                  {matchedParams.loadMin && (
-                    <div className="cp-param-item">
-                      <div className="cp-param-label">最低荷载</div>
-                      <div className="cp-param-value">≥ {matchedParams.loadMin} kN/㎡</div>
-                    </div>
-                  )}
-                  {matchedParams.heightMin && (
-                    <div className="cp-param-item">
-                      <div className="cp-param-label">最低层高</div>
-                      <div className="cp-param-value">≥ {matchedParams.heightMin} m</div>
-                    </div>
-                  )}
-                  {matchedParams.powerKV && (
-                    <div className="cp-param-item">
-                      <div className="cp-param-label">配电容量</div>
-                      <div className="cp-param-value">≥ {matchedParams.powerKV} kVA</div>
-                    </div>
-                  )}
-                  {matchedParams.dualPower && (
-                    <div className="cp-param-item">
-                      <div className="cp-param-label">供电要求</div>
-                      <div className="cp-param-value cp-param-warn">⚡ 需双回路供电</div>
-                    </div>
-                  )}
+                <div className="cp-params-title">{industryParams.name}</div>
+                <div className="cp-params-specs">
+                  {industryParams.loadMin && <span className="cp-spec-item">荷载≥{industryParams.loadMin}kN/㎡</span>}
+                  {industryParams.heightMin && <span className="cp-spec-item">层高≥{industryParams.heightMin}m</span>}
+                  {industryParams.powerKV && <span className="cp-spec-item">配电≥{industryParams.powerKV}kVA</span>}
+                  {industryParams.dualPower && <span className="cp-spec-item cp-spec-warn">⚡双回路</span>}
                 </div>
-                {matchedParams.special && matchedParams.special.length > 0 && (
-                  <div className="cp-params-special">
-                    {matchedParams.special.map((s: string, i: number) => (
-                      <span key={i} className="cp-special-tag">{s}</span>
+                {industryParams.special?.length > 0 && (
+                  <div className="cp-params-tags">
+                    {industryParams.special.map((s: string, i: number) => (
+                      <span key={i} className="cp-tag-orange">{s}</span>
                     ))}
                   </div>
                 )}
-                {matchedParams.remark && (
-                  <div className="cp-params-remark">💡 {matchedParams.remark}</div>
+                {industryParams.remark && (
+                  <div className="cp-params-remark">💡 {industryParams.remark}</div>
                 )}
                 <button className="cp-btn-apply" onClick={applyIndustryParams}>
                   ⭐ 一键填入筛选条件
@@ -334,79 +342,54 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         </div>
 
         {/* 专业筛选面板 */}
-        {showFilterPanel && (
+        {showFilter && (
           <div className="cp-filter-panel">
-            <div className="cp-filter-section-title">🏢 筛选条件</div>
+            <div className="cp-filter-panel-title">🏢 筛选条件</div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">园区</label>
-              <select
-                className="cp-filter-select"
-                value={filters.parkId ?? ""}
-                onChange={e => setFilters(f => ({ ...f, parkId: e.target.value || undefined }))}
-              >
-                <option value="">全部园区</option>
-                {Object.entries(PARKS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
+              <select className="cp-filter-select" value={fPark} onChange={e => setFPark(e.target.value)}>
+                {PARKS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">面积需求</label>
               <div className="cp-filter-range">
-                <input className="cp-filter-input" type="number" placeholder="最小(㎡)"
-                  value={filters.areaMin ?? ""}
-                  onChange={e => setFilters(f => ({ ...f, areaMin: e.target.value ? Number(e.target.value) : undefined }))}
-                />
-                <span style={{ color: "#94a3b8", fontSize: 12 }}>~</span>
-                <input className="cp-filter-input" type="number" placeholder="最大(㎡)"
-                  value={filters.areaMax ?? ""}
-                  onChange={e => setFilters(f => ({ ...f, areaMax: e.target.value ? Number(e.target.value) : undefined }))}
-                />
+                <input className="cp-filter-input" type="number" placeholder="最小㎡"
+                  value={fAreaMin} onChange={e => setFAreaMin(e.target.value)} />
+                <span>~</span>
+                <input className="cp-filter-input" type="number" placeholder="最大㎡"
+                  value={fAreaMax} onChange={e => setFAreaMax(e.target.value)} />
               </div>
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">租金上限</label>
               <input className="cp-filter-input" type="number" placeholder="元/㎡/天"
-                value={filters.priceMax ?? ""}
-                onChange={e => setFilters(f => ({ ...f, priceMax: e.target.value ? Number(e.target.value) : undefined }))}
-              />
+                value={fPriceMax} onChange={e => setFPriceMax(e.target.value)} />
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">最低荷载</label>
               <input className="cp-filter-input" type="number" placeholder="kN/㎡"
-                value={filters.loadMin ?? ""}
-                onChange={e => setFilters(f => ({ ...f, loadMin: e.target.value ? Number(e.target.value) : undefined }))}
-              />
+                value={fLoadMin} onChange={e => setFLoadMin(e.target.value)} />
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">最低层高</label>
               <input className="cp-filter-input" type="number" placeholder="米(m)"
-                value={filters.heightMin ?? ""}
-                onChange={e => setFilters(f => ({ ...f, heightMin: e.target.value ? Number(e.target.value) : undefined }))}
-              />
+                value={fHeightMin} onChange={e => setFHeightMin(e.target.value)} />
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">最低配电</label>
               <input className="cp-filter-input" type="number" placeholder="kVA"
-                value={filters.powerKVMin ?? ""}
-                onChange={e => setFilters(f => ({ ...f, powerKVMin: e.target.value ? Number(e.target.value) : undefined }))}
-              />
+                value={fPowerKVMin} onChange={e => setFPowerKVMin(e.target.value)} />
             </div>
             <div className="cp-filter-row">
               <label className="cp-filter-label">104地块</label>
-              <select
-                className="cp-filter-select"
-                value={filters.is104 ?? ""}
-                onChange={e => setFilters(f => ({ ...f, is104: e.target.value || undefined }))}
-              >
-                <option value="">不限</option>
-                <option value="是">是</option>
-                <option value="否">否</option>
+              <select className="cp-filter-select" value={fIs104} onChange={e => setFIs104(e.target.value)}>
+                {IS104_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="cp-filter-actions">
-              <button className="cp-btn-secondary" onClick={resetFilters}>重置</button>
-              <button className="cp-btn-primary" onClick={() => setShowFilterPanel(false)}>完成</button>
+              <button className="cp-btn-ghost" onClick={resetAll}>重置</button>
+              <button className="cp-btn-primary" onClick={() => setShowFilter(false)}>完成</button>
             </div>
           </div>
         )}
@@ -414,16 +397,12 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         {/* 工具栏 */}
         <div className="cp-toolbar">
           <span className="cp-count">
-            {aiResult
-              ? <><strong>{filteredBuildings.length}</strong> 栋匹配
-              </>
-              : <><strong>{filteredBuildings.length}</strong> / {buildings.length} 栋</>
-            }
+            {filtering ? "筛选中..." : <><strong>{totalCount}</strong> 栋 / {allBuildings.length} 栋</>}
           </span>
           <div className="cp-toolbar-right">
             {compareIds.size >= 2 && (
               <button className="cp-btn-compare" onClick={() => setShowCompare(true)}>
-                📊 对比 {compareIds.size}栋
+                📊 对比 {compareIds.size}
               </button>
             )}
           </div>
@@ -431,61 +410,49 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
 
         {/* 楼栋列表 */}
         <div className="cp-list">
-          {Object.entries(grouped).length === 0 ? (
+          {filtering ? (
+            <div className="cp-loading">
+              <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+            </div>
+          ) : resultUnits.length === 0 && activeFilterCount > 0 ? (
             <div className="cp-empty">未找到匹配楼栋</div>
           ) : (
-            Object.entries(grouped).map(([parkName, parkBlds]) => {
+            Object.entries(grouped).map(([parkName, items]) => {
               const isCollapsed = collapsedParks.has(parkName);
               return (
                 <div key={parkName} className="cp-park-group">
-                  <div
-                    className="cp-park-header"
-                    onClick={() => setCollapsedParks(prev => {
-                      const next = new Set(prev);
-                      isCollapsed ? next.delete(parkName) : next.add(parkName);
-                      return next;
-                    })}
-                  >
-                    <span>📍 {parkName}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span className="cp-park-count">{parkBlds.length}栋</span>
-                      <span className="cp-collapse-icon">{isCollapsed ? "▶" : "▼"}</span>
-                    </div>
+                  <div className="cp-park-header" onClick={() => setCollapsedParks(p => {
+                    const n = new Set(p); isCollapsed ? n.delete(parkName) : n.add(parkName); return n;
+                  })}>
+                    <span>📍 {parkName} <span className="cp-park-count">({items.length}栋)</span></span>
+                    <span className="cp-collapse-icon">{isCollapsed ? "▶" : "▼"}</span>
                   </div>
                   {!isCollapsed && (
                     <div className="cp-park-buildings">
-                      {parkBlds.map(b => {
-                        const isAiMatched = aiBuildingIds.has(b.building_id);
-                        const isActive = aiActiveBuildingId === b.building_id;
-                        const isCompare = compareIds.has(b.building_id);
+                      {items.map(u => {
+                        const isAi = aiBuildingIds.has(u.building_id);
+                        const isActive = aiActiveBuildingId === u.building_id;
+                        const isCompare = compareIds.has(u.building_id);
                         return (
                           <div
-                            key={b.building_id}
-                            className={[
-                              "cp-building-card",
-                              isAiMatched ? "ai-matched" : "",
-                              isActive ? "active" : "",
-                              isCompare ? "compare-selected" : "",
-                            ].filter(Boolean).join(" ")}
+                            key={u.building_id}
+                            className={["cp-building-card", isAi ? "ai-matched" : "", isActive ? "active" : "", isCompare ? "compare-selected" : ""].filter(Boolean).join(" ")}
                           >
-                            <div
-                              className="cp-building-checkbox"
-                              onClick={e => { e.stopPropagation(); toggleCompare(b.building_id); }}
-                            >
-                              <span style={{ fontSize: 13 }}>{isCompare ? "☑" : "☐"}</span>
+                            <div className="cp-building-check" onClick={e => { e.stopPropagation(); toggleCompare(u.building_id); }}>
+                              {isCompare ? "☑" : "☐"}
                             </div>
-                            <div className="cp-building-info" onClick={() => handleBuildingSelect(b.building_id)}>
+                            <div className="cp-building-info" onClick={() => handleBuildingSelect(u.building_id)}>
                               <div className="cp-building-name">
-                                <span>🏢 {b.name}</span>
-                                {isAiMatched && <span className="cp-ai-badge">🤖</span>}
+                                {u.building_name}
+                                {isAi && <span className="cp-ai-badge">🤖</span>}
                               </div>
                               <div className="cp-building-tags">
-                                {b.industry && <span className="cp-tag">{b.industry}</span>}
+                                {u.industry && <span className="cp-tag">{u.industry}</span>}
                               </div>
                               <div className="cp-building-stats">
-                                <span>空置 <strong>{b.area_vacant.toLocaleString()}㎡</strong></span>
-                                <span>{b.floors}F</span>
-                                {b.price != null && <span>{b.price}元/㎡·天</span>}
+                                <span>空置 <strong>{u.area_vacant?.toLocaleString() ?? "—"}㎡</strong></span>
+                                {u.floor != null && <span>{u.floor}层</span>}
+                                {u.price != null && <span>{u.price}元/㎡</span>}
                               </div>
                             </div>
                           </div>
@@ -503,14 +470,14 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
       {/* 右侧地图 */}
       <div className="cp-map-area">
         <PropertyMap
-          buildings={buildings.map(b => ({
-            building_id: b.building_id,
-            name: b.name || b.building_id,
-            industry: b.industry,
-            park_id: b.park_id,
-            park_name: b.park_name,
-            area_vacant: b.area_vacant,
-            floors: b.floors,
+          buildings={bldList.map(u => ({
+            building_id: u.building_id,
+            name: u.building_name || u.building_id,
+            industry: u.industry,
+            park_id: u.park_id,
+            park_name: u.park_name,
+            area_vacant: u.area_vacant ?? 0,
+            floors: u.floor ?? 1,
           }))}
           parks={[]}
           onSelect={id => id && handleBuildingSelect(id)}
@@ -521,32 +488,32 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
 
       {/* 详情面板 */}
       {selectedBuildingId && (
-        <BuildingDetailPanel
-          buildingId={selectedBuildingId}
-          onClose={() => setSelectedBuildingId(null)}
-        />
+        <BuildingDetailPanel buildingId={selectedBuildingId} onClose={() => setSelectedBuildingId(null)} />
       )}
 
       {/* 对比面板 */}
-      {showCompare && compareBuildings.length >= 2 && (
+      {showCompare && compareUnits.length >= 2 && (
         <div className="cp-compare-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCompare(false); }}>
           <div className="cp-compare-panel">
             <div className="cp-compare-header">
               <span>📊 楼栋对比</span>
               <div className="cp-compare-actions">
                 <button className="cp-btn-export" onClick={() => {
-                  const exportFields: [string, (b: BuildingSummary) => string][] = [
-                    ["园区", b => b.park_name || b.park_id || "—"],
-                    ["产业方向", b => b.industry || "—"],
-                    ["层数", b => `${b.floors}层`],
-                    ["总面积", b => `${b.area_total?.toLocaleString() ?? "—"}㎡`],
-                    ["空置面积", b => `${b.area_vacant.toLocaleString()}㎡`],
-                    ["租金单价", b => b.price ? `${b.price}元/㎡·天` : "—"],
+                  const fields: [string, (u: PropertyFilterResult["results"][number]) => string][] = [
+                    ["园区", u => u.park_name || "—"],
+                    ["产业", u => u.industry || "—"],
+                    ["楼层", u => u.floor != null ? `第${u.floor}层` : "—"],
+                    ["总面积", u => `${u.area_total?.toLocaleString() ?? "—"}㎡`],
+                    ["空置面积", u => `${u.area_vacant?.toLocaleString() ?? "—"}㎡`],
+                    ["层高", u => u.floor_height != null ? `${u.floor_height}m` : "—"],
+                    ["荷载", u => u.load != null ? `${u.load}kN/㎡` : "—"],
+                    ["配电", u => u.load != null ? `${u.load}kVA` : "—"],
+                    ["租金", u => u.price != null ? `${u.price}元/㎡·天` : "—"],
                   ];
-                  const rows = compareBuildings.map(b =>
-                    `<tr>${exportFields.map(([, fn]) => `<td style="padding:8px;border:1px solid #ddd">${fn(b)}</td>`).join("")}</tr>`
+                  const rows = compareUnits.map(u =>
+                    `<tr>${fields.map(([, fn]) => `<td style="padding:8px;border:1px solid #ddd">${fn(u)}</td>`).join("")}</tr>`
                   ).join("");
-                  const bldNames = compareBuildings.map(b => `<th style="padding:8px;border:1px solid #ddd;background:#3b6db5;color:white;font-weight:700">${b.name}</th>`).join("");
+                  const bldNames = compareUnits.map(u => `<th style="padding:8px;border:1px solid #ddd;background:#3b6db5;color:white;font-weight:700">${u.building_name}</th>`).join("");
                   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{padding:24px}table{border-collapse:collapse;width:100%}th,td{padding:8px;border:1px solid #ddd;font-size:13px}</style></head><body>
                     <h1 style="color:#3b6db5">楼栋对比</h1>
                     <table><thead><tr><th style="padding:8px;border:1px solid #ddd;background:#eef2ff">指标</th>${bldNames}</tr></thead><tbody>${rows}</tbody></table>
@@ -560,27 +527,27 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             <div className="cp-compare-body">
               <table className="cp-compare-table">
                 <thead>
-                  <tr>
-                    <th>指标</th>
-                    {compareBuildings.map(b => <th key={b.building_id}>{b.name}</th>)}
-                  </tr>
+                  <tr><th>指标</th>{compareUnits.map(u => <th key={u.building_id}>{u.building_name}</th>)}</tr>
                 </thead>
                 <tbody>
                   {([
-                    ["园区", (b: BuildingSummary) => b.park_name || b.park_id || "—"],
-                    ["产业方向", (b: BuildingSummary) => b.industry || "—"],
-                    ["层数", (b: BuildingSummary) => `${b.floors}层`],
-                    ["总面积", (b: BuildingSummary) => `${b.area_total?.toLocaleString() ?? "—"}㎡`],
-                    ["空置面积", (b: BuildingSummary) => ({ v: `${b.area_vacant.toLocaleString()}㎡`, highlight: true })],
-                    ["租金单价", (b: BuildingSummary) => b.price ? `${b.price}元/㎡·天` : "—"],
-                  ] as [string, (b: BuildingSummary) => { v: string; highlight?: boolean } | string][]).map(([label, fn]) => (
+                    ["园区", (u: PropertyFilterResult["results"][number]) => u.park_name || "—"],
+                    ["产业方向", (u: PropertyFilterResult["results"][number]) => u.industry || "—"],
+                    ["楼层", (u: PropertyFilterResult["results"][number]) => u.floor != null ? `第${u.floor}层` : "—"],
+                    ["总面积", (u: PropertyFilterResult["results"][number]) => `${u.area_total?.toLocaleString() ?? "—"}㎡`],
+                    ["空置面积", (u: PropertyFilterResult["results"][number]) => ({ v: `${u.area_vacant?.toLocaleString() ?? "—"}㎡`, hl: true })],
+                    ["层高", (u: PropertyFilterResult["results"][number]) => u.floor_height != null ? `${u.floor_height}m` : "—"],
+                    ["荷载", (u: PropertyFilterResult["results"][number]) => u.load != null ? `${u.load}kN/㎡` : "—"],
+                    ["配电", (u: PropertyFilterResult["results"][number]) => u.load != null ? `${u.load}kVA` : "—"],
+                    ["租金", (u: PropertyFilterResult["results"][number]) => u.price != null ? `${u.price}元/㎡·天` : "—"],
+                  ] as [string, (u: PropertyFilterResult["results"][number]) => { v: string; hl?: boolean } | string][]).map(([label, fn]) => (
                     <tr key={label}>
                       <td className="cp-compare-row-label">{label}</td>
-                      {compareBuildings.map(b => {
-                        const val = fn(b);
+                      {compareUnits.map(u => {
+                        const val = fn(u);
                         const v = typeof val === "object" ? val.v : val;
-                        const hl = typeof val === "object" ? val.highlight : false;
-                        return <td key={b.building_id} style={hl ? { color: "#059669", fontWeight: 600 } : {}}>{v}</td>;
+                        const hl = typeof val === "object" ? val.hl : false;
+                        return <td key={u.building_id} style={hl ? { color: "#059669", fontWeight: 600 } : {}}>{v}</td>;
                       })}
                     </tr>
                   ))}
