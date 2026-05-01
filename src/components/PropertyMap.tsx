@@ -30,13 +30,19 @@ interface Props {
   buildings: Building[];
   parks?: Park[];
   selectedId?: number | null;
-  onSelect?: (id: number | null) => void;
+  onSelect?: (id: string) => void;
+  aiBuildingIds?: Set<string>;
+  aiActiveBuildingId?: string | null;
 }
 
 // 金桥区域园区中心 GPS 坐标（硬编码，与飞书数据配套）
 const PARK_COORDS: Record<string, [number, number]> = {
   PARK001: [31.2437, 121.6107],
   PARK002: [31.2405, 121.6080],
+};
+const PARK_NAME_MAP: Record<string, string> = {
+  PARK001: "浦发上城科创智谷",
+  PARK002: "金桥地铁上盖J9B-14地块",
 };
 const MAP_CENTER: [number, number] = [31.242, 121.609];
 
@@ -63,7 +69,7 @@ function getBldCoord(b: Building): [number, number] | null {
   return [lat, lng];
 }
 
-export default function PropertyMap({ buildings, parks = [], selectedId, onSelect }: Props) {
+export default function PropertyMap({ buildings, parks = [], selectedId, onSelect, aiBuildingIds, aiActiveBuildingId }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -156,29 +162,49 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
     infoControlRef.current = info;
     info.addTo(map);
 
-    filteredBuildings.forEach((b, idx) => {
+    filteredBuildings.forEach((b) => {
       const coord = getBldCoord(b);
       if (!coord) return;
 
       const floors = b.floors ?? null;
-      const color = getFloorColor(floors);
       const name = b.name || b.building_id || "";
       const vacant = (b.area_vacant || 0).toLocaleString();
       const parkName = b.park_name || parks.find(p => p.park_id === b.park_id)?.name || b.park_id || "";
 
+      const isAiMatched = aiBuildingIds?.has(b.building_id ?? "") ?? false;
+      const isActive = aiActiveBuildingId === b.building_id;
+
+      // 普通楼栋：按层数着色；AI 匹配：蓝色；当前激活：红色描边放大
+      const baseColor = getFloorColor(floors);
+      const color = isAiMatched ? "#3b6db5" : baseColor;
+      const size = isAiMatched ? 20 : 14;
+      const borderWidth = isActive ? 4 : 2.5;
+      const borderColor = isActive ? "#e53e3e" : "white";
+      const zIndex = isActive ? 9999 : isAiMatched ? 1000 + (floors ?? 5) * 10 : (floors ?? 5) * 100;
+
       const icon = L.divIcon({
         className: "",
-        html: `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer;"></div>`,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8],
+        html: `<div style="
+          width:${size}px;
+          height:${size}px;
+          background:${color};
+          border-radius:50%;
+          border:${borderWidth}px solid ${borderColor};
+          box-shadow:0 2px 8px rgba(0,0,0,.35);
+          cursor:pointer;
+          ${isAiMatched ? `box-shadow:0 0 0 3px ${color}44, 0 2px 8px rgba(0,0,0,.3);` : ""}
+        "></div>`,
+        iconSize: [size + borderWidth * 2, size + borderWidth * 2],
+        iconAnchor: [(size + borderWidth * 2) / 2, (size + borderWidth * 2) / 2],
       });
 
-      const marker = L.marker(coord, { icon, zIndexOffset: (floors ?? 5) * 100 });
+      const marker = L.marker(coord, { icon, zIndexOffset: zIndex });
       marker.on("click", () => {
         setSelectedBld(b);
-        if (onSelect) onSelect(idx);
+        if (onSelect && b.building_id) onSelect(b.building_id);
       });
       marker.bindPopup(`<div style="font-family:PingFang SC,sans-serif;min-width:150px">
+        ${isAiMatched ? `<div style="background:#3b6db5;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px 4px 0 0;margin:-10px -10px 8px -10px">🤖 AI 匹配</div>` : ""}
         <div style="font-weight:700;font-size:14px;margin-bottom:4px;border-bottom:1px solid #eee;padding-bottom:6px">🏢 ${name}</div>
         <div style="color:#888;font-size:11px;margin-bottom:4px">${parkName}</div>
         <div style="font-size:12px;line-height:1.8">
@@ -196,28 +222,59 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
         infoControlRef.current = null;
       }
     };
-  }, [filteredBuildings, selectedPark, parks, onSelect]);
+  }, [filteredBuildings, selectedPark, parks, onSelect, aiBuildingIds, aiActiveBuildingId]);
 
-  // 跟随选中
+  // 跟随选中（地图模式或 AI 高亮）
   useEffect(() => {
     const map = mapInstRef.current;
-    if (!map || selectedId == null) return;
-    const b = buildings[selectedId];
-    if (!b) return;
-    const coord = getBldCoord(b);
+    if (!map) return;
+    let target: Building | null = null;
+    if (aiActiveBuildingId) {
+      target = buildings.find(b => b.building_id === aiActiveBuildingId) ?? null;
+    } else if (selectedId != null) {
+      target = buildings[selectedId as number];
+    }
+    if (!target) return;
+    const coord = getBldCoord(target);
     if (coord) map.flyTo(coord, 16, { duration: 0.8 });
-  }, [selectedId, buildings]);
+  }, [selectedId, buildings, aiActiveBuildingId]);
 
   const totalVacant = filteredBuildings.reduce((s, b) => s + (b.area_vacant || 0), 0);
   const parkSummaries = Object.entries(PARK_COORDS).map(([pid, _coord]) => {
     const blds = buildings.filter(b => b.park_id === pid);
     const vacant = blds.reduce((s, b) => s + (b.area_vacant || 0), 0);
     const park = parks.find(p => p.park_id === pid);
-    return { pid, name: park?.name || pid, blds, vacant };
+    return { pid, name: park?.name || PARK_NAME_MAP[pid] || pid, blds, vacant };
   });
 
   return (
     <div style={{ marginTop: 12 }}>
+      {/* AI 匹配结果提示 */}
+      {aiBuildingIds && aiBuildingIds.size > 0 && (
+        <div style={{
+          background: "linear-gradient(135deg, #eef2ff, #f8faff)",
+          border: "1.5px solid #93c5fd",
+          borderRadius: 10,
+          padding: "10px 16px",
+          marginBottom: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 18 }}>🤖</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "#1e40af" }}>
+              AI 智能匹配 · {aiBuildingIds.size} 栋楼匹配
+            </div>
+            {aiActiveBuildingId && (
+              <div style={{ fontSize: 12, color: "#3b6db5", marginTop: 2 }}>
+                已聚焦至地图高亮楼栋
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 顶部园区筛选 */}
       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
         <button
@@ -253,11 +310,14 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
         <div style={{
           marginTop: 10, background: "white", borderRadius: 10,
           padding: "12px 16px",
-          border: `1px solid ${getFloorColor(selectedBld.floors)}30`,
+          border: `1px solid ${aiBuildingIds?.has(selectedBld.building_id ?? "") ? "#93c5fd" : getFloorColor(selectedBld.floors) + "30"}`,
           boxShadow: "0 2px 8px rgba(0,0,0,.08)",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <div>
+            {aiBuildingIds?.has(selectedBld.building_id ?? "") && (
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#3b6db5", background: "#eef2ff", padding: "1px 8px", borderRadius: 10, display: "inline-block", marginBottom: 4 }}>🤖 AI 匹配</div>
+            )}
             <div style={{ fontSize: 15, fontWeight: 700 }}>
               🏢 {selectedBld.name || selectedBld.building_id}
             </div>
@@ -266,7 +326,7 @@ export default function PropertyMap({ buildings, parks = [], selectedId, onSelec
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: getFloorColor(selectedBld.floors) }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: aiBuildingIds?.has(selectedBld.building_id ?? "") ? "#3b6db5" : getFloorColor(selectedBld.floors) }}>
               {selectedBld.floors || "?"}F
             </div>
             <div style={{ fontSize: 12, color: "#999" }}>

@@ -60,6 +60,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       "类别颜色标签 + 链接跳转",
     ],
   },
+  {
+    version: "v2.2",
+    date: "2026-04",
+    changes: [
+      "AI 智能匹配：自然语言查询政策和物业",
+      "RAG 模式注入飞书实时数据，NVIDIA Llama 模型",
+      "Cloudflare KV 缓存 + 每30分钟 CRON 预热",
+      "自动过滤已过期政策",
+    ],
+  },
 ];
 
 export default function HomePage({ policyCount, carrierCount, news }: Props) {
@@ -74,7 +84,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             整合物业载体资源与政策信息，赋能一线招商团队
           </p>
           <div className="banner-meta">
-            <span>v2.1 · Tauri v2 · React 18</span>
+            <span>v2.2 · React 18 · Cloudflare Workers</span>
           </div>
         </div>
         <div className="banner-right">
@@ -87,12 +97,12 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             <div className="stat-label">物业载体</div>
           </div>
           <div className="stat-card">
-            <div className="stat-num">2</div>
-            <div className="stat-label">已启用模块</div>
+            <div className="stat-num">v2.2</div>
+            <div className="stat-label">AI智能匹配</div>
           </div>
           <div className="stat-card">
-            <div className="stat-num">2</div>
-            <div className="stat-label">待开发模块</div>
+            <div className="stat-num">2/4</div>
+            <div className="stat-label">模块进度</div>
           </div>
         </div>
       </div>
@@ -208,8 +218,8 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             <div className="about-icon">⚙️</div>
             <div className="about-title">技术架构</div>
             <div className="about-text">
-              基于 Tauri v2 桌面框架构建，前端 React 18 + TypeScript，后端 Rust，支持
-              Windows/macOS 双平台。
+              网页端 React 18 + Vite，AI 代理基于 Cloudflare Workers（NVIDIA Llama
+              RAG），数据来自飞书表格，KV 缓存每30分钟刷新。
             </div>
           </div>
           <div className="about-card">
