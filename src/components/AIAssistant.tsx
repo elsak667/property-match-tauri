@@ -43,15 +43,21 @@ async function aiSearch(q: string): Promise<AiSearchResult> {
   return data.data ?? { policies: [], properties: [], summary: "" };
 }
 
-export default function AIAssistant() {
+interface Props {
+  aiActiveBuildingId?: string | null;
+  onAiResultChange?: (result: AiSearchResult | null) => void;
+  onAiBuildingClick?: (buildingId: string) => void;
+}
+
+export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAiBuildingClick }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<AiSearchResult | null>(null);
   const [filters, setFilters] = useState<string>("");
-  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const activeBuildingId = aiActiveBuildingId ?? null;
 
   // 点击外部关闭
   useEffect(() => {
@@ -73,12 +79,13 @@ export default function AIAssistant() {
       const res = await aiSearch(query.trim());
       setFilters(query.trim());
       setResult(res);
+      onAiResultChange?.(res);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, onAiResultChange]);
 
   const handleExport = () => {
     if (!result) return;
@@ -198,7 +205,7 @@ ${propTable}
                   <div className="ai-panel-divider" />
                   <div className="ai-panel-section-label">🏢 物业载体</div>
                   {result.properties.map((p, i) => (
-                    <div key={i} className="ai-panel-item ai-panel-item-prop" style={{ cursor: "pointer" }} onClick={() => p.building_id && setActiveBuildingId(p.building_id)}>
+                    <div key={i} className="ai-panel-item ai-panel-item-prop" style={{ cursor: "pointer" }} onClick={() => p.building_id && onAiBuildingClick?.(p.building_id)}>
                       <div className="ai-panel-item-name">
                         <span className="ai-score">{p.score}</span>
                         {p.building || p.name}
@@ -218,7 +225,7 @@ ${propTable}
         </div>
       )}
       {activeBuildingId && (
-        <BuildingDetailPanel buildingId={activeBuildingId} onClose={() => setActiveBuildingId(null)} />
+        <BuildingDetailPanel buildingId={activeBuildingId} onClose={() => onAiBuildingClick?.("")} />
       )}
     </>
   );
