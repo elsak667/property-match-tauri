@@ -8,10 +8,29 @@ import AIAssistant from "./components/AIAssistant";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
 
-type Page = "home" | "property" | "policy" | "placeholder-invest" | "placeholder-industry";
+type Page = "home" | "policy" | "property" | "placeholder-invest" | "placeholder-industry";
+
+// AI 搜索结果共享类型（与 AIAssistant.tsx 保持一致）
+interface AiPropertyMatch {
+  id: number;
+  name: string;
+  building: string;
+  building_id: string;
+  park: string;
+  match_reason: string;
+  score: number;
+}
+interface AiSearchResult {
+  policies: unknown[];
+  properties: AiPropertyMatch[];
+  summary: string;
+}
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  // AI 搜索结果：提升到 App 层，供 CarrierPage（地图）使用
+  const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
+  const [aiActiveBuildingId, setAiActiveBuildingId] = useState<string | null>(null);
   const { policies } = usePolicies();
   const { properties } = useProperties();
   const { news } = useNews();
@@ -34,7 +53,16 @@ export default function App() {
         <div className="container">
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
-          {currentPage === "property" && <CarrierPage />}
+          {currentPage === "property" && (
+            <CarrierPage
+              aiResult={aiResult}
+              onAiBuildingClick={(buildingId: string) => {
+                setAiActiveBuildingId(buildingId);
+                setCurrentPage("property");
+              }}
+              aiActiveBuildingId={aiActiveBuildingId}
+            />
+          )}
           {currentPage === "placeholder-invest" && (
             <PlaceholderPage
               title="招商管理"
@@ -52,7 +80,18 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-      <AIAssistant />
+      <AIAssistant
+        aiActiveBuildingId={aiActiveBuildingId}
+        onAiResultChange={setAiResult}
+        onAiBuildingClick={(buildingId: string) => {
+          if (buildingId === "") {
+            setAiActiveBuildingId(null);
+          } else {
+            setAiActiveBuildingId(buildingId);
+            if (currentPage !== "property") setCurrentPage("property");
+          }
+        }}
+      />
       <Feedback />
     </div>
   );
