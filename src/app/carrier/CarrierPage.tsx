@@ -3,7 +3,7 @@
  * - 非专业用户：AI 搜索 + 推荐卡片 + 地图
  * - 专业招商人员：可展开多维筛选面板 + 批量对比
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { fetchBuildings, filterProperties, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
 import PropertyMap from "../../components/PropertyMap";
@@ -91,7 +91,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   // 园区折叠
   const [collapsedParks, setCollapsedParks] = useState<Set<string>>(new Set());
 
-  // 加载全量楼栋
+  // 加载全量楼栋（用于楼栋列表和地图坐标）
   useEffect(() => {
     fetchBuildings()
       .then(data => { setAllBuildings(data ?? []); setLoading(false); })
@@ -112,7 +112,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     setActiveFilterCount(c);
   }, [fPark, fAreaMin, fAreaMax, fPriceMax, fLoadMin, fHeightMin, fPowerKVMin, fIs104]);
 
-  // 执行筛选（调用 API）
+  // 执行筛选（调用 API，获得面积/租金/产业数据）
   const doFilter = useCallback(async () => {
     setFiltering(true);
     try {
@@ -141,6 +141,49 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     const t = setTimeout(doFilter, 400);
     return () => clearTimeout(t);
   }, [doFilter]);
+
+  // 从 filter 结果中按 building_id 聚合面积（取最大值）和租金/产业
+  const filterMeta = useMemo(() => {
+    const map = new Map<string, { area_vacant: number; price: number | null; industry: string }>();
+    (filtered?.results ?? []).forEach(u => {
+      if (!map.has(u.building_id)) {
+        map.set(u.building_id, { area_vacant: u.area_vacant ?? 0, price: u.price ?? null, industry: u.industry ?? "" });
+      } else {
+        const prev = map.get(u.building_id)!;
+        prev.area_vacant = Math.max(prev.area_vacant, u.area_vacant ?? 0);
+        if (u.price != null && prev.price == null) prev.price = u.price;
+        if (!prev.industry && u.industry) prev.industry = u.industry;
+      }
+    });
+    return map;
+  }, [filtered]);
+
+  // 楼栋搜索
+  const [nameQuery, setNameQuery] = useState("");
+
+  // 以 fetchBuildings 为基准，合并 filter 数据
+  let displayBuildings = allBuildings.filter(b => !fPark || b.park_id === fPark);
+  if (nameQuery.trim()) {
+    const q = nameQuery.trim().toLowerCase();
+    displayBuildings = displayBuildings.filter(b =>
+      (b.name || "").toLowerCase().includes(q) ||
+      (b.industry || "").toLowerCase().includes(q) ||
+      (b.park_name || "").toLowerCase().includes(q)
+    );
+  }
+
+  // 园区分组
+  const grouped = displayBuildings.reduce<Record<string, typeof displayBuildings>>((acc, b) => {
+    const key = b.park_name || "其他";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(b);
+    return acc;
+  }, {});
+
+  // 园区数量和楼栋数量
+  const parkCount = Object.keys(grouped).length;
+  const totalBldCount = displayBuildings.length;
+  const uniqueBuildingCount = totalBldCount;
 
   // AI 匹配楼栋
   const aiBuildingIds = new Set((aiResult?.properties ?? []).map(p => p.building_id).filter(Boolean));
@@ -190,38 +233,8 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     setShowFilter(true);
   }
 
-  // 楼栋搜索
-  const [nameQuery, setNameQuery] = useState("");
-
-  // 筛选结果
+  // 对比数据（基于 filter 结果）
   const resultUnits = filtered?.results ?? [];
-
-  // 按楼栋去重并分组（基于 building_id）
-  const bldMap = new Map<string, PropertyFilterResult["results"][number]>();
-  resultUnits.forEach(u => {
-    if (!bldMap.has(u.building_id)) bldMap.set(u.building_id, u);
-  });
-  let bldList = Array.from(bldMap.values());
-  const uniqueBuildingCount = bldList.length;
-
-  // 搜索过滤（前端即时）
-  if (nameQuery.trim()) {
-    const q = nameQuery.trim().toLowerCase();
-    bldList = bldList.filter(u =>
-      (u.building_name || "").toLowerCase().includes(q) ||
-      (u.industry || "").toLowerCase().includes(q) ||
-      (u.park_name || "").toLowerCase().includes(q)
-    );
-  }
-
-  const grouped = bldList.reduce<Record<string, typeof bldList>>((acc, u) => {
-    const key = u.park_name || "其他";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(u);
-    return acc;
-  }, {});
-
-  // 对比数据
   const compareUnits = resultUnits.filter(u => compareIds.has(u.building_id));
 
   if (loading) {
@@ -410,11 +423,37 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             </div>
           </div>
         )}
+      </div>
 
+      {/* 右侧：地图在上，楼栋列表在下 */}
+      <div className="cp-right-panel">
+        {/* 地图 */}
+        <div className="cp-map-area">
+          <PropertyMap
+          buildings={displayBuildings.map(b => ({
+            building_id: b.building_id,
+            name: b.name || b.building_id,
+            industry: b.industry,
+            park_id: b.park_id,
+            park_name: b.park_name,
+            area_vacant: filterMeta.get(b.building_id)?.area_vacant ?? b.area_vacant,
+            floors: b.floors,
+            "纬度(lat)": b.lat,
+            "经度(lng)": b.lng,
+          }))}
+          parks={[]}
+          onSelect={id => id && handleBuildingSelect(id)}
+          aiBuildingIds={aiBuildingIds}
+          aiActiveBuildingId={aiActiveBuildingId}
+        />
+      </div>
+
+      {/* 楼栋列表（可滚动） */}
+      <div className="cp-list-area">
         {/* 工具栏 */}
         <div className="cp-toolbar">
           <span className="cp-count">
-            {filtering ? "筛选中..." : <><strong>{uniqueBuildingCount}</strong> 栋楼</>}
+            {filtering ? "筛选中..." : <><strong>{parkCount}</strong>个园区 <strong>{uniqueBuildingCount}</strong>栋楼</>}
           </span>
           <div className="cp-toolbar-right">
             {compareIds.size >= 2 && (
@@ -431,7 +470,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             <div className="cp-loading">
               <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
             </div>
-          ) : resultUnits.length === 0 && activeFilterCount > 0 ? (
+          ) : displayBuildings.length === 0 && activeFilterCount > 0 ? (
             <div className="cp-empty">未找到匹配楼栋</div>
           ) : (
             Object.entries(grouped).map(([parkName, items]) => {
@@ -446,30 +485,34 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                   </div>
                   {!isCollapsed && (
                     <div className="cp-park-buildings">
-                      {items.map(u => {
-                        const isAi = aiBuildingIds.has(u.building_id);
-                        const isActive = aiActiveBuildingId === u.building_id;
-                        const isCompare = compareIds.has(u.building_id);
+                      {items.map(b => {
+                        const isAi = aiBuildingIds.has(b.building_id);
+                        const isActive = aiActiveBuildingId === b.building_id;
+                        const isCompare = compareIds.has(b.building_id);
+                        const meta = filterMeta.get(b.building_id);
+                        const areaVacant = meta?.area_vacant ?? b.area_vacant;
+                        const price = meta?.price ?? b.price;
+                        const industry = meta?.industry || b.industry;
                         return (
                           <div
-                            key={u.building_id}
+                            key={b.building_id}
                             className={["cp-building-card", isAi ? "ai-matched" : "", isActive ? "active" : "", isCompare ? "compare-selected" : ""].filter(Boolean).join(" ")}
                           >
-                            <div className="cp-building-check" onClick={e => { e.stopPropagation(); toggleCompare(u.building_id); }}>
+                            <div className="cp-building-check" onClick={e => { e.stopPropagation(); toggleCompare(b.building_id); }}>
                               {isCompare ? "☑" : "☐"}
                             </div>
-                            <div className="cp-building-info" onClick={() => handleBuildingSelect(u.building_id)}>
+                            <div className="cp-building-info" onClick={() => handleBuildingSelect(b.building_id)}>
                               <div className="cp-building-name">
-                                {u.building_name}
+                                {b.name}
                                 {isAi && <span className="cp-ai-badge">🤖</span>}
                               </div>
                               <div className="cp-building-tags">
-                                {u.industry && <span className="cp-tag">{u.industry}</span>}
+                                {industry && <span className="cp-tag">{industry}</span>}
                               </div>
                               <div className="cp-building-stats">
-                                <span>空置 <strong>{u.area_vacant?.toLocaleString() ?? "—"}㎡</strong></span>
-                                {u.floor != null && <span>{u.floor}层</span>}
-                                {u.price != null && <span>{u.price}元/㎡</span>}
+                                <span>空置 <strong>{areaVacant > 0 ? `${areaVacant.toLocaleString()}㎡` : "—"}</strong></span>
+                                <span>{b.floors}层</span>
+                                {price != null && <span>{price}元/㎡</span>}
                               </div>
                             </div>
                           </div>
@@ -483,24 +526,6 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           )}
         </div>
       </div>
-
-      {/* 右侧地图 */}
-      <div className="cp-map-area">
-        <PropertyMap
-          buildings={bldList.map(u => ({
-            building_id: u.building_id,
-            name: u.building_name || u.building_id,
-            industry: u.industry,
-            park_id: u.park_id,
-            park_name: u.park_name,
-            area_vacant: u.area_vacant ?? 0,
-            floors: u.floor ?? 1,
-          }))}
-          parks={[]}
-          onSelect={id => id && handleBuildingSelect(id)}
-          aiBuildingIds={aiBuildingIds}
-          aiActiveBuildingId={aiActiveBuildingId}
-        />
       </div>
 
       {/* 详情面板 */}
