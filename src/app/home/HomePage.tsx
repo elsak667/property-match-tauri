@@ -17,6 +17,44 @@ interface Props {
   news: { time: string; category: string; title: string; link: string; summary: string }[];
 }
 
+const VERSIONS = [
+  {
+    version: "V1.0",
+    month: "2026.03",
+    name: "招商平台上线",
+    features: ["政策匹配", "物业载体", "飞书数据接入"],
+    status: "done" as const,
+  },
+  {
+    version: "V1.5",
+    month: "2026.04",
+    name: "首页改版",
+    features: ["产业快讯", "模块化布局", "护眼配色"],
+    status: "done" as const,
+  },
+  {
+    version: "V2.0",
+    month: "2026.05",
+    name: "AI 增强",
+    features: ["智能推荐", "自然语言检索", "自动化报告"],
+    status: "active" as const,
+  },
+  {
+    version: "V2.5",
+    month: "2026.06",
+    name: "招商管理",
+    features: ["客户管理", "跟进记录", "企业档案"],
+    status: "planned" as const,
+  },
+  {
+    version: "V3.0",
+    month: "2026.08",
+    name: "产业图谱",
+    features: ["产业赛道分析", "热力图", "行业分布"],
+    status: "planned" as const,
+  },
+];
+
 const NEWS_COLORS: Record<string, string> = {
   IPO:       "#c9842a",
   投融资:    "#2d6a4f",
@@ -39,14 +77,15 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
     let scrollPos = 0;
     let paused = false;
 
-    const total = list.scrollHeight;
-    const client = list.clientHeight;
-
     const doScroll = () => {
-      if (paused || total <= client) return;
-      scrollPos += 1;
-      if (scrollPos >= total - client) scrollPos = 0;
-      list.scrollTop = scrollPos;
+      const total = list.scrollHeight;
+      const client = list.clientHeight;
+      if (total <= client) return;
+      if (!paused) {
+        scrollPos += 1;
+        if (scrollPos >= total - client) scrollPos = 0;
+        list.scrollTop = scrollPos;
+      }
       timer = setTimeout(doScroll, 40);
     };
 
@@ -216,6 +255,55 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── 版本进度横排 ── */}
+      <div className="version-track">
+        <div className="version-header">
+          <span className="version-title">版本进度</span>
+          <span className="version-subtitle">持续迭代 · 招商平台 Roadmap</span>
+        </div>
+        <div className="version-list">
+          {VERSIONS.map((v, i) => (
+            <div key={i} className={`version-item version-${v.status}`}>
+              <div className="version-connector">
+                <div
+                  className={`version-line ${
+                    i === 0 ? "version-line-end"
+                      : VERSIONS[i - 1].status === "done" && v.status === "done" ? "version-line-done"
+                      : VERSIONS[i - 1].status === "done" && v.status === "active" ? "version-line-done-active"
+                      : VERSIONS[i - 1].status === "active" && v.status === "active" ? "version-line-active"
+                      : VERSIONS[i - 1].status === "active" && v.status === "planned" ? "version-line-active-planned"
+                      : "version-line-planned"
+                  }`}
+                  style={{ position: "absolute", left: 0, width: "50%" }}
+                />
+                <div className={`version-dot ${v.status === "active" ? "pulse" : ""}`} />
+                <div
+                  className={`version-line ${
+                    i === VERSIONS.length - 1 ? "version-line-end"
+                      : v.status === "done" ? "version-line-done"
+                      : v.status === "active" ? "version-line-active"
+                      : "version-line-planned"
+                  }`}
+                  style={{ position: "absolute", right: 0, width: "50%" }}
+                />
+              </div>
+              <div className="version-card">
+                <div className="version-meta">
+                  <span className="version-badge">{v.version}</span>
+                  <span className="version-month">{v.month}</span>
+                </div>
+                <div className="version-name">{v.name}</div>
+                <div className="version-features">
+                  {v.features.map((f, j) => (
+                    <span key={j} className="version-feature">{f}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
