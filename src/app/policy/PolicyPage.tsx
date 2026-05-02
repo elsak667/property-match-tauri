@@ -5,6 +5,7 @@ import { usePolicies } from "../../lib/useFeishu";
 import { getPolicyStats } from "../../lib/tauri";
 import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
+import { trackExport, trackClick, trackSearch, trackView } from "../../lib/track";
 
 function stripHtml(text: string): string {
   if (!text) return "";
@@ -48,7 +49,7 @@ function PolicyCard({
           <input
             type="checkbox"
             checked={isSelected}
-            onChange={() => onToggleSelect(name)}
+            onChange={() => { onToggleSelect(name); trackClick(name); }}
             style={{ marginTop: "3px", cursor: "pointer" }}
             aria-label={name}
           />
@@ -184,6 +185,7 @@ export default function PolicyPage() {
   }, []);
 
   const doMatch = useCallback(() => {
+    trackSearch(query);
     setMatchLoading(true);
     setTimeout(() => {
       const filtered = filterPolicies(policies, {
@@ -193,7 +195,6 @@ export default function PolicyPage() {
         dept,
         caps,
       });
-      // 按发布时间倒序
       const sorted = [...filtered].sort((a, b) => {
         const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
         const tb = b.zcReleaseTime ? new Date(b.zcReleaseTime).getTime() : 0;
@@ -204,6 +205,15 @@ export default function PolicyPage() {
     }, 300);
   }, [policies, query, industries, location, dept, caps]);
 
+  const handleToggleExpand = useCallback((name: string) => {
+    trackView(name);
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(doMatch, 300);
     return () => clearTimeout(t);
@@ -213,13 +223,7 @@ export default function PolicyPage() {
     setArr(arr.includes(k) ? arr.filter(x => x !== k) : [...arr, k]);
   }
 
-  function toggleExpand(id: string) {
-    const next = new Set(expanded);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setExpanded(next);
-  }
-
-  function toggleSelect(id: string) {
+  const toggleSelect = (id: string) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelected(next);
@@ -245,6 +249,7 @@ export default function PolicyPage() {
     if (selected.size === 0) { showToast("error", "请先选择要导出的政策"); return; }
     const selectedItems = results.filter(r => selected.has(r.name || ""));
     if (selectedItems.length === 0) { showToast("error", "请先选择要导出的政策"); return; }
+    trackExport(selectedItems.map(i => i.name || ""));
     await openPrintHtml(selectedItems, companyName || "某企业");
     showToast("info", "浏览器已打开，请在浏览器中打印保存为 PDF");
   }
@@ -446,7 +451,7 @@ export default function PolicyPage() {
                   item={item}
                   expanded={expanded}
                   selected={selected}
-                  onToggleExpand={toggleExpand}
+                  onToggleExpand={handleToggleExpand}
                   onToggleSelect={toggleSelect}
                 />
               ))
