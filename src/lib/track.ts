@@ -18,6 +18,7 @@ function getSessionId(): string {
 
 interface TrackPayload {
   action: string;
+  session_id?: string;
   policy_id?: string;
   unit_id?: string;
   search_query?: string;
