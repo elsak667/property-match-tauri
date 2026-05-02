@@ -1,19 +1,28 @@
 /**
- * Workers API 调用层
- * 开发时：Vite proxy 代理到 localhost:8787（本地 wrangler dev）
- * 生产时：直接请求 Cloudflare Workers
+ * 数据获取层 — 优先静态 JSON（CDN），Workers 作为 fallback
+ * VITE_USE_WORKERS=true 时走 Workers API（兼容旧逻辑）
+ * VITE_USE_WORKERS=false 时走静态 JSON（同源 /data/）
  */
 
-const BASE = "https://api.elsak.eu.org/api";
+const USE_WORKERS = import.meta.env.VITE_USE_WORKERS === "true";
+const WORKERS_BASE = "https://api.elsak.eu.org/api";
+const STATIC_BASE = "/data";
 
 async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${WORKERS_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error: string }).error || `HTTP ${res.status}`);
   }
+  return res.json() as T;
+}
+
+// ── 静态 JSON 读取（优先）───────────────────────────────────────────────────
+async function fetchStatic<T>(filename: string): Promise<T> {
+  const res = await fetch(`${STATIC_BASE}/${filename}`);
+  if (!res.ok) throw new Error(`Static fetch failed: ${res.status} ${filename}`);
   return res.json() as T;
 }
 
@@ -133,3 +142,31 @@ export interface BuildingSummary {
 }
 
 export const fetchBuildings = () => request<BuildingSummary[]>("/buildings");
+
+// ── 静态 JSON fallback（优先）────────────────────────────────────────────────
+export async function fetchNewsFromFeishu(): Promise<NewsItem[]> {
+  if (USE_WORKERS) return request<NewsItem[]>("/news");
+  try {
+    return await fetchStatic<NewsItem[]>("news.json");
+  } catch {
+    return request<NewsItem[]>("/news");
+  }
+}
+
+export async function fetchPoliciesFromFeishu(): Promise<SheetData> {
+  if (USE_WORKERS) return request<SheetData>("/policies");
+  try {
+    const data = await fetchStatic<{ headers: string[]; data: Record<string, unknown>[] }>("policies.json");
+    return { headers: data.headers, data: data.data };
+  } catch {
+    return request<SheetData>("/policies");
+  }
+}
+
+export async function getWorkersPolicyStatsFromStatic(): Promise<PolicyStats> {
+  try {
+    return await fetchStatic<PolicyStats>("stats.json");
+  } catch {
+    return request<PolicyStats>("/property-stats");
+  }
+}
