@@ -1,0 +1,34 @@
+name: 张通社新闻抓取
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */2 * * *"  # 每2小时跑一次
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests openpyxl playwright
+        shell: bash
+
+      - name: Install playwright browsers
+        run: playwright install chromium --with-deps
+        shell: bash
+
+      - name: Run scrape
+        run: python3 scripts/scrape_zhangtongshe.py
+        shell: bash
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          NEWS_SHEET_TOKEN: ${{ secrets.NEWS_SHEET_TOKEN }}
+          NEWS_SHEET_ID: ${{ secrets.NEWS_SHEET_ID }}
