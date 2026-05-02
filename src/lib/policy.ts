@@ -620,9 +620,6 @@ export function getStars(rank: number): string {
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
 // Uses Tauri invoke to call Rust backend Feishu proxy commands.
 
-const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-const POLICY_SHEET_ID = "0aad30";
-
 interface TenantToken { token: string; expiresAt: number; }
 let cachedToken: TenantToken | null = null;
 
@@ -669,14 +666,23 @@ async function getSheetData(sheetToken: string, sheetId: string, range?: string)
 
 export async function getPolicySheetRows(): Promise<unknown[][]> {
   if (import.meta.env.VITE_USE_WORKERS) {
-    const { fetchPoliciesFromWorkers } = await import("./workers");
-    const result = await fetchPoliciesFromWorkers();
+    const { fetchPoliciesFromFeishu } = await import("./workers");
+    const result = await fetchPoliciesFromFeishu();
     // Transform SheetData back to unknown[][] format for loadPolicies()
     return [result.headers, ...result.data.map(row =>
       result.headers.map(h => row[h] ?? null)
     )];
   }
-  return getSheetData(POLICY_SPREADSHEET, POLICY_SHEET_ID, "A1:U600");
+  // Read from static JSON (CDN) — workers.ts handles fallback internally
+  try {
+    const { fetchPoliciesFromFeishu } = await import("./workers");
+    const result = await fetchPoliciesFromFeishu();
+    return [result.headers, ...result.data.map(row =>
+      result.headers.map(h => row[h] ?? null)
+    )];
+  } catch {
+    return [];
+  }
 }
 
 // ── 物业数据加载（适配 Vite/Tauri 浏览器环境）───────────────────────────────

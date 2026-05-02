@@ -9,17 +9,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
         shell: bash
+
+      - name: Export Feishu data to JSON
+        run: python3 scripts/export_feishu_to_json.py
+        shell: bash
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
 
       - run: pnpm run build
         shell: bash
