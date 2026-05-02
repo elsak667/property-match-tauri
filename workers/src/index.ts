@@ -877,6 +877,63 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    // /api/track — 行为追踪（永久累积，不覆盖）
+    if (path === "/api/track" && request.method === "POST") {
+      try {
+        const body = await request.json() as {
+          session_id?: string;
+          action: string;
+          policy_id?: string;
+          unit_id?: string;
+          search_query?: string;
+          extra?: Record<string, unknown>;
+        };
+        const { session_id, action, policy_id, unit_id, search_query, extra } = body;
+        const ts = Date.now();
+
+        // 原子递增统计（永不覆盖，只归档不删除）
+        if (policy_id) {
+          const prefix = action === "export" ? "stat:export"
+            : action === "click" ? "stat:click"
+            : action === "view" ? "stat:view"
+            : action === "detail" ? "stat:detail"
+            : "stat:other";
+          const key = `${prefix}:${policy_id}`;
+          const prev = Number(await env.CACHE.get(key).catch(() => "0") || "0");
+          await env.CACHE.put(key, String(prev + 1), { expirationTtl: 86400 * 365 * 10 }).catch(() => {});
+        }
+        if (unit_id) {
+          const prev = Number(await env.CACHE.get(`stat:export:unit:${unit_id}`).catch(() => "0") || "0");
+          await env.CACHE.put(`stat:export:unit:${unit_id}`, String(prev + 1), { expirationTtl: 86400 * 365 * 10 }).catch(() => {});
+        }
+        // 搜索词频率（用于同义词发现）
+        if (search_query && action === "search") {
+          const hash = await hashString(search_query);
+          const prev = Number(await env.CACHE.get(`query:freq:${hash}`).catch(() => "0") || "0");
+          await env.CACHE.put(`query:freq:${hash}`, JSON.stringify({ count: prev + 1, last: ts, query: search_query }), { expirationTtl: 86400 * 365 * 10 }).catch(() => {});
+        }
+        // 共现矩阵（同时导出的政策对）
+        if (action === "export" && extra?.co_exported?.length) {
+          const policyIds: string[] = extra.co_exported as string[];
+          for (let i = 0; i < policyIds.length; i++) {
+            for (let j = i + 1; j < policyIds.length; j++) {
+              const a = policyIds[i] < policyIds[j] ? policyIds[i] : policyIds[j];
+              const b = policyIds[i] < policyIds[j] ? policyIds[j] : policyIds[i];
+              const prev = Number(await env.CACHE.get(`coexport:${a}:${b}`).catch(() => "0") || "0");
+              await env.CACHE.put(`coexport:${a}:${b}`, String(prev + 1), { expirationTtl: 86400 * 365 * 10 }).catch(() => {});
+            }
+          }
+        }
+        // session 行为日志（可聚合分析）
+        const logKey = `log:${session_id || "anon"}:${ts}`;
+        await env.CACHE.put(logKey, JSON.stringify({ action, policy_id, unit_id, search_query, ts }), { expirationTtl: 86400 * 30 }).catch(() => {});
+
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Invalid request" }, 400);
+      }
+    }
+
     // /api/ai/search?q=自然语言查询（RAG 模式）
     if (path === "/api/ai/search" && request.method === "GET") {
       const q = url.searchParams.get("q") || "";
