@@ -1,11 +1,10 @@
 /**
- * 飞书数据 Hook — 优先 Workers API，失配时降级到 Mock
+ * 飞书数据 Hook — 从 workers.ts 获取数据（静态 JSON 或 Workers fallback）
  */
 import { useState, useEffect, useCallback } from "react";
 import {
-  getWorkersConfig as getFeishuConfig,
-  fetchPoliciesFromWorkers as fetchPoliciesFromFeishu,
-  fetchNewsFromWorkers as fetchNewsFromFeishu,
+  fetchPoliciesFromFeishu,
+  fetchNewsFromFeishu,
   type SheetData,
   type NewsItem,
 } from "./workers";
@@ -163,24 +162,20 @@ export function usePolicies() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const cfg = await getFeishuConfig();
-      if (cfg.has_credentials) {
-        const raw = await fetchPoliciesFromFeishu();
-        if (raw.data.length > 0) {
-          const normalized = normalizePolicies(raw);
-          setPolicies(normalized);
-          const built = buildOptions(normalized);
-          // 动态构建缺字段时用 MOCK_OPTIONS 兜底
-          const opts: FilterOptions = {
-            ...built,
-            caps: built.caps.length > 0 ? built.caps : MOCK_OPTIONS.caps,
-            thresholds: built.thresholds.length > 0 ? built.thresholds : MOCK_OPTIONS.thresholds,
-          };
-          setOptions(opts);
-          setFromFeishu(true);
-          setLoading(false);
-          return;
-        }
+      const raw = await fetchPoliciesFromFeishu();
+      if (raw.data.length > 0) {
+        const normalized = normalizePolicies(raw);
+        setPolicies(normalized);
+        const built = buildOptions(normalized);
+        const opts: FilterOptions = {
+          ...built,
+          caps: built.caps.length > 0 ? built.caps : MOCK_OPTIONS.caps,
+          thresholds: built.thresholds.length > 0 ? built.thresholds : MOCK_OPTIONS.thresholds,
+        };
+        setOptions(opts);
+        setFromFeishu(true);
+        setLoading(false);
+        return;
       }
     } catch {
       // 降级到 mock
@@ -218,12 +213,9 @@ export function useNews() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const cfg = await getFeishuConfig();
-      if (cfg.has_credentials) {
-        const items = await fetchNewsFromFeishu();
-        setNews(items);
-      }
-} catch (e) {
+      const items = await fetchNewsFromFeishu();
+      setNews(items);
+    } catch (e) {
       console.error("[useNews] fetch error:", e);
     } finally {
       setLoading(false);
