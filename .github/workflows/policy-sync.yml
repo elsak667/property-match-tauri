@@ -1,0 +1,52 @@
+name: Pudong Policy Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_sync:
+        description: "跑完整流程（需要 sgin，否则只跑 Step 4）"
+        required: false
+        default: "false"
+        type: boolean
+      sgin:
+        description: "浦东 API sgin（full_sync=true 时需要）"
+        required: false
+        type: string
+
+  schedule:
+    - cron: "0 22 * * *"  # 每天 22:00 北京时间 = 14:00 UTC
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests openpyxl playwright
+        shell: bash
+
+      - name: Install playwright browsers
+        run: playwright install chromium --with-deps
+        shell: bash
+
+      - name: Run Step 4 only (scheduled or no sgin)
+        if: github.event.inputs.sgin == '' || github.event.inputs.sgin == null
+        run: python3 scripts/pudong_fetch_and_tag.py --step4-only
+        shell: bash
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+
+      - name: Run full sync (manual with sgin)
+        if: github.event.inputs.full_sync == 'true' && github.event.inputs.sgin != ''
+        run: python3 scripts/pudong_fetch_and_tag.py --sgin "${{ github.event.inputs.sgin }}"
+        shell: bash
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
