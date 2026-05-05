@@ -7,6 +7,9 @@ const TRACK_ENDPOINT = "/api/track";
 const SESSION_KEY = "pm_session";
 const USE_WORKERS = import.meta.env.VITE_USE_WORKERS === "true";
 
+// 上次搜索词（用于共现分析：导出时记录这次搜了什么）
+export let lastSearchQuery = "";
+
 function getSessionId(): string {
   let sid = sessionStorage.getItem(SESSION_KEY);
   if (!sid) {
@@ -61,6 +64,7 @@ export function trackDetail(policyId: string): void {
 
 export function trackSearch(query: string): void {
   if (!query.trim()) return;
+  lastSearchQuery = query;
   trackEvent({ action: "search", search_query: query });
 }
 
