@@ -15,6 +15,7 @@ on:
 
   schedule:
     - cron: "0 22 * * *"  # 每天 22:00 北京时间 = 14:00 UTC
+      branches: [dev]
 
 jobs:
   sync:
