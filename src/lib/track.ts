@@ -44,7 +44,13 @@ export function trackEvent(payload: TrackPayload): void {
 export function trackExport(policyIds: string[]): void {
   if (!policyIds.length) return;
   const coExported = policyIds.slice(0, -1);
-  trackEvent({ action: "export", extra: { co_exported: coExported } });
+  trackEvent({
+    action: "export",
+    extra: {
+      co_exported: coExported,
+      search_query: lastSearchQuery,
+    },
+  });
   for (const id of policyIds) {
     trackEvent({ action: "export", policy_id: id });
   }
