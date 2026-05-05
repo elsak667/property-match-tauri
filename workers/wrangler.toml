@@ -18,6 +18,9 @@ NEWS_SHEET_ID = "b6daf2"
 PROPERTY_PARK_SHEET_ID = "4hdJSg"
 PROPERTY_UNIT_SHEET_ID = "4hdJSi"
 PROPERTY_INDUSTRY_SHEET_ID = "4hdJSj"
+SUPABASE_URL = "https://rgnncmgrumwjjgzyhmkt.supabase.co"
+JINA_API_KEY = "***REMOVED***"
+HF_ACCESS_TOKEN = "***REMOVED***"
 
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["0 22 * * *"]

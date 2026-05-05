@@ -5,7 +5,7 @@ import { usePolicies } from "../../lib/useFeishu";
 import { getPolicyStats } from "../../lib/tauri";
 import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
-import { trackExport, trackClick, trackSearch, trackView } from "../../lib/track";
+import { trackExport, trackClick, trackSearch, trackDetail } from "../../lib/track";
 
 function stripHtml(text: string): string {
   if (!text) return "";
@@ -206,7 +206,7 @@ export default function PolicyPage() {
   }, [policies, query, industries, location, dept, caps]);
 
   const handleToggleExpand = useCallback((name: string) => {
-    trackView(name);
+    trackDetail(name);
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name); else next.add(name);
