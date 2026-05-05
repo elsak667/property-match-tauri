@@ -46,7 +46,7 @@ interface ConversationLog {
 }
 
 // ── 常量 ────────────────────────────────────────────────────────────────────────
-const BASE = "https://api.elsak.eu.org/api";
+const BASE = "https://api.198857.sbs/api";
 
 const QUERY_SUGGESTIONS = [
   "张江 AI 企业 100 万补贴",

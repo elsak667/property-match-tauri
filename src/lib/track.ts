@@ -26,7 +26,7 @@ interface TrackPayload {
 }
 
 export function trackEvent(payload: TrackPayload): void {
-  const base = USE_WORKERS ? "https://api.elsak.eu.org" : "";
+  const base = USE_WORKERS ? "https://api.198857.sbs" : "";
   const body = {
     session_id: getSessionId(),
     ...payload,

@@ -117,6 +117,12 @@ pnpm run build
 | `/api/news` | GET | 获取新闻列表（26条） |
 | `/api/properties?type=单元` | GET | 获取物业数据（园区/楼宇/单元/产业字典） |
 | `/api/property-stats` | GET | 获取统计数据 |
+| `/api/ai/search?q=...` | GET | AI 语义搜索（RAG，向量匹配） |
+
+## API 域名
+
+- **生产环境**: `https://api.198857.sbs`
+- **旧域名**: `https://api.elsak.eu.org`（已废弃，仅保留过渡）
 
 ## 四、权限说明
 

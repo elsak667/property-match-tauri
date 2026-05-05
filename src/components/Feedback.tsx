@@ -4,7 +4,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Icon } from "./Icons";
 
-const BASE = "https://api.elsak.eu.org/api";
+const BASE = "https://api.198857.sbs/api";
 
 async function submitFeedback(data: { type: string; content: string; contact: string; screenshot?: string }) {
   const res = await fetch(`${BASE}/feedback`, {

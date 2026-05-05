@@ -5,7 +5,7 @@
  */
 
 const USE_WORKERS = import.meta.env.VITE_USE_WORKERS === "true";
-const WORKERS_BASE = "https://api.elsak.eu.org/api";
+const WORKERS_BASE = "https://api.198857.sbs/api";
 const STATIC_BASE = "/data";
 
 async function request<T>(path: string): Promise<T> {
