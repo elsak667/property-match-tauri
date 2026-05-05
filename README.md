@@ -25,6 +25,6 @@ pnpm run dev
 
 ## 部署
 
-前端部署到任意静态托管（Vercel / Cloudflare Pages），Workers 独立部署。
-
-Workers 端点：`https://api.elsak.eu.org`
+- **前端**: `https://pudong.198857.sbs`（Cloudflare Pages）
+- **API**: `https://api.198857.sbs`（Cloudflare Workers）
+- **旧前端域名**: `property-match-tauri.pages.dev`（已废弃）
