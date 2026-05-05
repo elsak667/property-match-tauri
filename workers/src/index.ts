@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 
 interface Env {
   FEISHU_APP_ID: string;
-  ***REMOVED***: string;
+  FEISHU_APP_SECRET: string;
   PROPERTY_SHEET: string;
   PROPERTY_BUILDING_SHEET_ID: string;
   POLICY_SHEET: string;
@@ -20,7 +20,7 @@ interface Env {
   FEEDBACK_BITABLE_TOKEN: string;
   FEEDBACK_TABLE_ID: string;
   SERVERCHAN_KEY: string;
-  ***REMOVED***: string;
+  NVIDIA_API_KEY: string;
   HF_ACCESS_TOKEN: string;
   CACHE: KVNamespace;
   SUPABASE_URL: string;
@@ -285,7 +285,7 @@ async function getToken(env: Env): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_id: env.FEISHU_APP_ID, app_secret: env.***REMOVED*** }),
+    body: JSON.stringify({ app_id: env.FEISHU_APP_ID, app_secret: env.FEISHU_APP_SECRET }),
   });
   const data = await res.json() as { code: number; msg?: string; tenant_access_token?: string };
   if (data.code !== 0 || !data.tenant_access_token) {
@@ -1005,7 +1005,7 @@ function applyFeedbackBoost(score: number, fb: FeedbackScores, maxScore: number)
 async function handleAiQuery(query: string, env: Env): Promise<Response> {
   try {
     const data = await getFeishuData(env);
-    const nvidiaKey = env.***REMOVED*** || "";
+    const nvidiaKey = env.NVIDIA_API_KEY || "";
 
     // ── LLM 意图解析（第一次 LLM 调用）────────────────────────────────────
     const intentPromise = parseIntent(query, nvidiaKey);
@@ -1194,7 +1194,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     if (path === "/api/config" && request.method === "GET") {
       return json({
         has_app_id: !!env.FEISHU_APP_ID,
-        has_credentials: !!(env.FEISHU_APP_ID && env.***REMOVED***),
+        has_credentials: !!(env.FEISHU_APP_ID && env.FEISHU_APP_SECRET),
         property_sheet: env.PROPERTY_SHEET,
         policy_sheet: env.POLICY_SHEET,
       });

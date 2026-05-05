@@ -19,7 +19,7 @@ except ImportError:
     pass
 
 FEISHU_APP_ID = os.environ["FEISHU_APP_ID"]
-***REMOVED*** = os.environ["***REMOVED***"]
+FEISHU_APP_SECRET = os.environ["FEISHU_APP_SECRET"]
 NEWS_SHEET_TOKEN = os.environ["NEWS_SHEET_TOKEN"]
 NEWS_SHEET_ID = os.environ["NEWS_SHEET_ID"]
 TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -32,7 +32,7 @@ def normalize_title(title: str) -> str:
     return title.replace('“', '"').replace('”', '"').replace('「', '"').replace('」', '"')
 
 def get_token():
-    payload = json.dumps({"app_id": FEISHU_APP_ID, "app_secret": ***REMOVED***}).encode()
+    payload = json.dumps({"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}).encode()
     req = urllib.request.Request(TOKEN_URL, data=payload,
         headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=15) as resp:

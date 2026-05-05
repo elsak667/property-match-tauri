@@ -37,7 +37,7 @@ cd workers
 
 ```bash
 FEISHU_APP_ID=cli_a950307a10b8dcb1
-***REMOVED***=你的飞书应用密钥
+FEISHU_APP_SECRET=你的飞书应用密钥
 ```
 
 ### 3. 启动本地 Workers
@@ -75,7 +75,7 @@ cd workers
 npx wrangler secret put FEISHU_APP_ID
 # 输入你的飞书 App ID
 
-npx wrangler secret put ***REMOVED***
+npx wrangler secret put FEISHU_APP_SECRET
 # 输入你的飞书 App Secret
 ```
 

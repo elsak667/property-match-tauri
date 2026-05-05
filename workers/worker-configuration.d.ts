@@ -18,7 +18,7 @@ declare namespace Cloudflare {
 		PROPERTY_UNIT_SHEET_ID: "4hdJSi";
 		PROPERTY_INDUSTRY_SHEET_ID: "4hdJSj";
 		FEISHU_APP_ID: string;
-		***REMOVED***: string;
+		FEISHU_APP_SECRET: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

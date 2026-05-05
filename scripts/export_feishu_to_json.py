@@ -23,7 +23,7 @@ except ImportError:
 # 飞书配置
 # ═══════════════════════════════════════════════════════════════
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "")
-***REMOVED*** = os.environ.get("***REMOVED***", "")
+FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 
 SHEET_API = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets"
 TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -51,11 +51,11 @@ def fatal(msg):
     sys.exit(1)
 
 def get_token():
-    if not FEISHU_APP_ID or not ***REMOVED***:
-        raise RuntimeError("FEISHU_APP_ID / ***REMOVED*** 环境变量未设置")
+    if not FEISHU_APP_ID or not FEISHU_APP_SECRET:
+        raise RuntimeError("FEISHU_APP_ID / FEISHU_APP_SECRET 环境变量未设置")
     resp = requests.post(
         TOKEN_URL,
-        json={"app_id": FEISHU_APP_ID, "app_secret": ***REMOVED***},
+        json={"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET},
         timeout=15,
         proxies={"http": None, "https": None}
     )

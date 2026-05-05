@@ -37,7 +37,7 @@ HEADERS = {
 # 飞书
 FEISHU = {
     "app_id":     os.environ.get("FEISHU_APP_ID", "cli_a950307a10b8dcb1"),
-    "app_secret": os.environ.get("***REMOVED***", "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj"),
+    "app_secret": os.environ.get("FEISHU_APP_SECRET", "TFlBj160Jm4p48uZ3t4RETpL3qz1oxaj"),
     "sheet_token": "DwqqsS6TShlGhAteDf3cHRwvnHe",
     "sheet_id":   "0aad30",
 }

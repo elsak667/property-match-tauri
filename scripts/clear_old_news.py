@@ -17,7 +17,7 @@ except ImportError:
     pass
 
 FEISHU_APP_ID = os.environ["FEISHU_APP_ID"]
-***REMOVED*** = os.environ["***REMOVED***"]
+FEISHU_APP_SECRET = os.environ["FEISHU_APP_SECRET"]
 NEWS_SHEET = os.environ["NEWS_SHEET"]
 NEWS_SHEET_ID = os.environ["NEWS_SHEET_ID"]
 FEISHU_HOST = os.environ.get("FEISHU_HOST", "https://open.feishu.cn")
@@ -26,7 +26,7 @@ FEISHU_HOST = os.environ.get("FEISHU_HOST", "https://open.feishu.cn")
 def get_token() -> str:
     url = f"{FEISHU_HOST}/open-apis/auth/v3/tenant_access_token/internal"
     req = urllib.request.Request(url,
-        data=json.dumps({"app_id": FEISHU_APP_ID, "app_secret": ***REMOVED***}).encode(),
+        data=json.dumps({"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.load(resp)

@@ -42,7 +42,7 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
 
       - name: Run full sync (manual with sgin)
         if: github.event.inputs.full_sync == 'true' && github.event.inputs.sgin != ''
@@ -50,7 +50,7 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
 
       - name: Export updated data to JSON
         run: |
@@ -63,4 +63,4 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
