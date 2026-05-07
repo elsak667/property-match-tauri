@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
-import { getPolicyStats } from "../../lib/tauri";
 import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
 import { trackExport, trackClick, trackSearch, trackDetail, trackCopy } from "../../lib/track";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 function stripHtml(text: string): string {
   if (!text) return "";
@@ -175,14 +176,17 @@ export default function PolicyPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const s = await getPolicyStats();
+        const res = await fetch(`${API_BASE}/api/property-stats`);
+        const s = await res.json();
+        const localCount = policies.length;
+        const officialCount = s.official_count > 0 ? s.official_count : 0;
         setStats({
-          local数据库: policies.length,
-          官方总数: s.official_count,
-          匹配率: s.official_count > 0 ? `${Math.round(policies.length / s.official_count * 100)}%` : "—",
-          差异: s.official_count > 0 ? policies.length - s.official_count : 0,
-          数据来源: s.source,
-          官方链接: s.official_link,
+          local数据库: localCount,
+          官方总数: officialCount,
+          匹配率: officialCount > 0 ? `${Math.round(localCount / officialCount * 100)}%` : "—",
+          差异: officialCount > 0 ? localCount - officialCount : 0,
+          数据来源: s.source || "浦易达官网",
+          官方链接: s.official_link || "https://pyd.pudong.gov.cn/website/pud/policyretrieval",
         });
       } catch { /* ignore */ }
     }
