@@ -30,11 +30,15 @@ jobs:
       - run: pnpm run build
         shell: bash
 
-      - name: Push to dev
+      - name: Create PR with data updates
         run: |
           git add -A
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "auto deploy at $(date '+%Y-%m-%d %H:%M')" || exit 0
-          git push origin dev
+          git checkout -b chore/feishu-data-$(date '+%Y%m%d-%H%M%S')
+          git commit -m "chore: sync Feishu data at $(date '+%Y-%m-%d %H:%M')" || exit 0
+          git push origin chore/feishu-data-$(date '+%Y%m%d-%H%M%S')
+          gh pr create --base dev --head chore/feishu-data-$(date '+%Y%m%d-%H%M%S') --title "chore: sync Feishu data $(date '+%Y-%m-%d')" --body "自动同步飞书数据更新"
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
