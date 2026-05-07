@@ -861,7 +861,44 @@ function extractKeywords(text: string): string[] {
       }
     }
   }
-  return [...new Set(words)];
+  // 同义词展开（行业术语别名）
+  const SYNONYMS: Record<string, string[]> = {
+    "ai": ["人工智能", "智能ai", "ai智能", "机器学习", "大模型", "模型"],
+    "人工智能": ["ai", "智能ai", "ai智能", "机器学习"],
+    "芯片": ["集成电路", "半导体", "ic", "芯片产业", "集成电路产业"],
+    "半导体": ["芯片", "集成电路", "ic"],
+    "集成电路": ["芯片", "半导体", "ic"],
+    "新能源": ["光伏", "储能", "锂电", "电动汽车", "动力电池", "氢能", "风电"],
+    "智能制造": ["智能工厂", "数字化转型", "工业互联网", "智能装备"],
+    "生物医药": ["生物药", "创新药", "医疗器械", "医药", "基因编辑", "细胞治疗"],
+    "医疗器械": ["医疗设备", "医用设备", "诊断设备"],
+    "软件": ["软件信息", "信息技术", "信息服务", "云计算", "大数据", "物联网"],
+    "互联网": ["网络", "信息化", "数字化"],
+    "金融": ["科技金融", "金融科技", "fintech", "供应链金融"],
+    "租房补贴": ["人才租房", "租房优惠", "住房补贴", "人才公寓", "租房扶持"],
+    "人才": ["高层次人才", "专技人才", "海归", "留学人才"],
+    "租金": ["房租", "租费", "场地租金", "办公租金"],
+    "载体": ["楼宇", "园区", "厂房", "办公楼", "研发空间", "产业空间"],
+    "楼宇": ["写字楼", "办公楼", "商务楼", "产业楼宇"],
+    "园区": ["产业园", "工业园区", "科技园", "产业园区"],
+    "补贴": ["资助", "扶持", "奖励", "补助", "贴息", "优惠"],
+    "研发": ["研究开发", "技术创新", "r&d"],
+    "创业": ["创新创业", "创业扶持", "创业孵化"],
+    "孵化": ["创业孵化", "孵化器", "众创空间"],
+    "资质": ["认定", "认证", "荣誉资质", "示范资质"],
+    "绿色": ["低碳", "节能", "环保", "碳中和", "可持续"],
+    "跨境": ["进出口", "外贸", "通关", "自贸区"],
+    "浦东": ["浦东新区", "上海浦东", "自贸区"],
+    "张江": ["张江科学城", "张江示范区"],
+  };
+  const expanded = new Set(words);
+  for (const word of words) {
+    const syns = SYNONYMS[word];
+    if (syns) {
+      for (const s of syns) expanded.add(s);
+    }
+  }
+  return [...expanded];
 }
 
 async function getHybridSearchScores(query: string, policies: PolicySummary[], env: Env): Promise<HybridResult> {
@@ -1119,40 +1156,70 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     }
 
     // ── LLM 理由生成（第二次 LLM 调用）─────────────────────────────────
+    // 超时时降级：返回关键词匹配结果，不返回 500 错误
     const policyCtx = topPolicies.map((p) => `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`).join("\n");
     const propCtx = topProperties.map((p) => `【得分${p.score}】${p.building || p.name}（${p.park || "—"}）| 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | building_id:${p.detail.building_id}`).join("\n");
 
-    const ragRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "meta/llama-3.1-8b-instruct",
-        messages: [
-          { role: "system", content: AI_SYSTEM_PROMPT_RAG },
-          { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
-        ],
-        max_tokens: 1024,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!ragRes.ok) {
-      const text = await ragRes.text();
-      console.error(`[NVIDIA] RAG API error ${ragRes.status}: ${text.slice(0, 200)}`);
-      throw new Error(`NVIDIA API ${ragRes.status}`);
-    }
-    const ragText: string = (await ragRes.json() as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
-
-    const jsonMatch = ragText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return json({ success: true, data: parsed, query });
-      } catch {
-        return json({ success: true, raw: ragText, query });
+    try {
+      const ragRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            { role: "system", content: AI_SYSTEM_PROMPT_RAG },
+            { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
+          ],
+          max_tokens: 1024,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!ragRes.ok) {
+        const text = await ragRes.text();
+        console.error(`[NVIDIA] RAG API error ${ragRes.status}: ${text.slice(0, 200)}`);
+        throw new Error(`NVIDIA API ${ragRes.status}`);
       }
+      const ragText: string = (await ragRes.json() as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
+      const jsonMatch = ragText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return json({ success: true, data: parsed, query });
+        } catch {
+          return json({ success: true, raw: ragText, query });
+        }
+      }
+      return json({ success: true, raw: ragText, query });
+    } catch (err: unknown) {
+      // LLM 超时/失败时，降级返回关键词匹配结果（仍保留 topPolicies/topProperties）
+      const degradedSummary = topPolicies.length > 0
+        ? `AI 搜索超时，以下为关键词匹配结果（共${topPolicies.length}条政策）：${topPolicies.map(p => p.name).join("、")}`
+        : `AI 搜索超时，以下为关键词匹配结果（共${topProperties.length}条载体）：${topProperties.map(p => p.building || p.name).join("、")}`;
+      return json({
+        success: true,
+        degraded: true,
+        data: {
+          policies: topPolicies.map(p => ({
+            id: p.id,
+            name: p.name,
+            match_reason: `关键词匹配得分 ${p.score}（AI 说明生成超时）`,
+            score: p.score,
+          })),
+          properties: topProperties.map(p => ({
+            id: p.detail?.building_id || p.id,
+            name: p.name,
+            building: p.building,
+            building_id: p.detail?.building_id,
+            park: p.park,
+            match_reason: `关键词匹配得分 ${p.score}（AI 说明生成超时）`,
+            score: p.score,
+          })),
+          summary: degradedSummary,
+        },
+        query,
+      });
     }
-    return json({ success: true, raw: ragText, query });
   } catch (err: unknown) {
     return json({ success: false, error: (err as Error).message }, 500);
   }
