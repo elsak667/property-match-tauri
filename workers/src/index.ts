@@ -1156,40 +1156,70 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     }
 
     // ── LLM 理由生成（第二次 LLM 调用）─────────────────────────────────
+    // 超时时降级：返回关键词匹配结果，不返回 500 错误
     const policyCtx = topPolicies.map((p) => `【得分${p.score}】${p.detail.name} | 行业:${p.detail.industry || "不限"} | 补贴:${p.detail.amount_s} | 区域:${p.detail.area || "不限"} | 主体:${p.detail.subject || "不限"}`).join("\n");
     const propCtx = topProperties.map((p) => `【得分${p.score}】${p.building || p.name}（${p.park || "—"}）| 面积:${p.area_total || p.area_vacant || "—"}㎡ | 租金:${p.price || "—"}元/㎡·天 | 行业:${p.industry || "不限"} | building_id:${p.detail.building_id}`).join("\n");
 
-    const ragRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "meta/llama-3.1-8b-instruct",
-        messages: [
-          { role: "system", content: AI_SYSTEM_PROMPT_RAG },
-          { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
-        ],
-        max_tokens: 1024,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!ragRes.ok) {
-      const text = await ragRes.text();
-      console.error(`[NVIDIA] RAG API error ${ragRes.status}: ${text.slice(0, 200)}`);
-      throw new Error(`NVIDIA API ${ragRes.status}`);
-    }
-    const ragText: string = (await ragRes.json() as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
-
-    const jsonMatch = ragText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return json({ success: true, data: parsed, query });
-      } catch {
-        return json({ success: true, raw: ragText, query });
+    try {
+      const ragRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "meta/llama-3.1-8b-instruct",
+          messages: [
+            { role: "system", content: AI_SYSTEM_PROMPT_RAG },
+            { role: "user", content: `用户需求：${query}\n\n【待生成理由的政策（已按关键词评分，已归一化）】\n${policyCtx}\n\n【待生成理由的物业载体（已按关键词评分，已归一化）】\n${propCtx}` },
+          ],
+          max_tokens: 1024,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!ragRes.ok) {
+        const text = await ragRes.text();
+        console.error(`[NVIDIA] RAG API error ${ragRes.status}: ${text.slice(0, 200)}`);
+        throw new Error(`NVIDIA API ${ragRes.status}`);
       }
+      const ragText: string = (await ragRes.json() as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? "";
+      const jsonMatch = ragText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return json({ success: true, data: parsed, query });
+        } catch {
+          return json({ success: true, raw: ragText, query });
+        }
+      }
+      return json({ success: true, raw: ragText, query });
+    } catch (err: unknown) {
+      // LLM 超时/失败时，降级返回关键词匹配结果（仍保留 topPolicies/topProperties）
+      const degradedSummary = topPolicies.length > 0
+        ? `AI 搜索超时，以下为关键词匹配结果（共${topPolicies.length}条政策）：${topPolicies.map(p => p.name).join("、")}`
+        : `AI 搜索超时，以下为关键词匹配结果（共${topProperties.length}条载体）：${topProperties.map(p => p.building || p.name).join("、")}`;
+      return json({
+        success: true,
+        degraded: true,
+        data: {
+          policies: topPolicies.map(p => ({
+            id: p.id,
+            name: p.name,
+            match_reason: `关键词匹配得分 ${p.score}（AI 说明生成超时）`,
+            score: p.score,
+          })),
+          properties: topProperties.map(p => ({
+            id: p.detail?.building_id || p.id,
+            name: p.name,
+            building: p.building,
+            building_id: p.detail?.building_id,
+            park: p.park,
+            match_reason: `关键词匹配得分 ${p.score}（AI 说明生成超时）`,
+            score: p.score,
+          })),
+          summary: degradedSummary,
+        },
+        query,
+      });
     }
-    return json({ success: true, raw: ragText, query });
   } catch (err: unknown) {
     return json({ success: false, error: (err as Error).message }, 500);
   }

@@ -27,6 +27,7 @@ interface AiSearchResult {
   policies: AiPolicyMatch[];
   properties: AiPropertyMatch[];
   summary: string;
+  degraded?: boolean;
 }
 
 type AiState = "greeting" | "collecting" | "searching" | "result" | "rating";
@@ -425,6 +426,11 @@ ${propTable}
           {/* 结果 */}
           {result && state === "result" && (
             <div className="ai-panel-body">
+              {result.degraded && (
+                <div className="ai-panel-error" style={{ marginBottom: 8 }}>
+                  <Icon.alertAccent /> AI 说明生成超时，已返回关键词匹配结果
+                </div>
+              )}
               {result.summary && <div className="ai-panel-summary">{result.summary}</div>}
               <div className="ai-panel-stat">
                 <span>政策 <strong>{result.policies.length}</strong></span>
