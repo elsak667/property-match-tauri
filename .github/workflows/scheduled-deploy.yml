@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npm install -g pnpm && pnpm install --frozen-lockfile
+      - run: npm install -g pnpm && pnpm install --no-frozen-lockfile
         shell: bash
 
       - name: Export Feishu data to JSON
