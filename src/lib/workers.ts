@@ -8,15 +8,27 @@ const USE_WORKERS = import.meta.env.VITE_USE_WORKERS === "true";
 const WORKERS_BASE = "https://api.198857.sbs/api";
 const STATIC_BASE = "/data";
 
-async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`${WORKERS_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error: string }).error || `HTTP ${res.status}`);
+async function request<T>(path: string, timeoutMs = 15000): Promise<T> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${WORKERS_BASE}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+    });
+    clearTimeout(id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error: string }).error || `HTTP ${res.status}`);
+    }
+    return res.json() as T;
+  } catch (e) {
+    clearTimeout(id);
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`请求超时（${timeoutMs / 1000}s）：${path}`);
+    }
+    throw e;
   }
-  return res.json() as T;
 }
 
 // ── 静态 JSON 读取（优先）───────────────────────────────────────────────────

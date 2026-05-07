@@ -30,15 +30,19 @@ interface TrackPayload {
 
 export function trackEvent(payload: TrackPayload): void {
   const base = USE_WORKERS ? "https://api.198857.sbs" : "";
-  const body = {
-    session_id: getSessionId(),
-    ...payload,
-  };
+  const body = { session_id: getSessionId(), ...payload };
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 8000);
   fetch(`${base}${TRACK_ENDPOINT}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }).catch(() => {});
+    signal: controller.signal,
+  }).catch(err => {
+    if (err instanceof Error && err.name !== "AbortError") {
+      console.warn("[track] failed:", err.message);
+    }
+  }).finally(() => clearTimeout(id));
 }
 
 export function trackExport(policyIds: string[]): void {
