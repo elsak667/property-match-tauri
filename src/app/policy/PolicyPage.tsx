@@ -293,22 +293,29 @@ export default function PolicyPage() {
           <span className="policy-hero-title">政策匹配</span>
           <span className="policy-hero-sub">Policy Intelligence</span>
           <div className="policy-hero-divider" />
-          <div className="policy-hero-tagline">智能检索 · 精准筛选 · AI 驱动决策</div>
+          <div className="policy-hero-tagline">数据来源：{stats?.数据来源 || "加载中..."}</div>
         </div>
         <div className="policy-hero-stats">
           <span className="policy-hero-stat">
             <strong>{policies.length}</strong>
-            <span>政策</span>
+            <span>本地政策</span>
           </span>
           <span className="policy-hero-stat-sep">·</span>
           <span className="policy-hero-stat">
-            <strong>{options.industries.length}</strong>
-            <span>产业方向</span>
+            <strong>{stats && stats.官方总数 > 0 ? stats.官方总数 : "—"}</strong>
+            <span>官网总数</span>
           </span>
           <span className="policy-hero-stat-sep">·</span>
           <span className="policy-hero-stat">
-            <strong>{results.length}</strong>
-            <span>当前匹配</span>
+            <strong style={{ color: "#4ade80" }}>{stats?.匹配率 || "—"}</strong>
+            <span>覆盖率</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong style={{ color: stats && (stats.差异 as number) >= 0 ? "#4ade80" : "#f87171" }}>
+              {stats ? ((stats.差异 as number) >= 0 ? "+" : "") + stats.差异 : "—"}
+            </strong>
+            <span>差异</span>
           </span>
         </div>
       </div>
@@ -360,21 +367,6 @@ export default function PolicyPage() {
         </div>
       </div>
 
-      {stats && (
-        <div className="stats-bar">
-          <span className="stats-bar-label"><Icon.chartAccent /> 数据对比</span>
-          <div className="stats-items">
-            <div className="stats-item"><span className="stats-item-num">{stats.local数据库}</span><span className="stats-item-label">本地政策</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num">{stats.官方总数 > 0 ? stats.官方总数 : "—"}</span><span className="stats-item-label">官网总数</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num" style={{ color: "#059669" }}>{stats.匹配率}</span><span className="stats-item-label">覆盖率</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num" style={{ color: stats.差异 >= 0 ? "#1a3a6e" : "#dc2626" }}>{stats.差异 >= 0 ? "+" : ""}{stats.差异}</span><span className="stats-item-label">差异</span></div>
-          </div>
-          <div className="stats-source">{stats.数据来源} <a href={stats.官方链接} target="_blank" rel="noopener noreferrer">浦易达官网 →</a></div>
-        </div>
-      )}
 
       <div className="main-layout">
         <aside className="sidebar">
