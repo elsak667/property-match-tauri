@@ -100,15 +100,13 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
       ["空置面积", u => `${u.area_vacant?.toLocaleString() ?? "—"}㎡`],
       ["层高", u => u.floor_height != null ? `${u.floor_height}m` : "—"],
       ["荷载", u => u.load != null ? `${u.load}kN/㎡` : "—"],
-      ["配电", u => u.power_kv != null ? `${u.power_kv}kVA` : "—"],
+      ["配电", u => u.load != null ? `${u.load}kVA` : "—"],
       ["租金", u => u.price != null ? `${u.price}元/㎡·天` : "—"],
     ];
-    const colCount = compareUnits.length + 1;
     const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
 
     const rows = fields.map(([label, fn]) => {
       const cells = compareUnits.map(u => `<td>${fn(u)}</td>`).join("");
-      const isHighlight = label === "空置面积";
       return `<tr><td class="label">${label}</td>${cells}</tr>`;
     }).join("");
 
