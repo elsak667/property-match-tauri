@@ -3,7 +3,7 @@ name: Scheduled Deploy to Dev
 on:
   workflow_dispatch:  # 手动触发：GitHub Actions 页面点击 Run workflow
   schedule:
-    - cron: "0 9 * * *"  # 每天 9:00 UTC = 17:00 北京时间
+    - cron: "0 12 * * *"  # 每天 12:00 UTC = 20:00 北京时间
 
 jobs:
   deploy:

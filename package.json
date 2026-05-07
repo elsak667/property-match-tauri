@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
+    "deploy": "pnpm run build && npx wrangler pages deploy dist --project-name=property-match-tauri --branch=production && bash scripts/purge-cache.sh",
     "tauri:dev": "unset ALL_PROXY all_proxy && dotenv -e src-tauri/.env -- tauri dev",
     "tauri:build": "tauri build"
   },
