@@ -1,0 +1,40 @@
+name: Purge CDN Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "要清理缓存的域名"
+        required: true
+        default: "pudong.198857.sbs"
+        type: choice
+        options:
+          - "pudong.198857.sbs"
+          - "property-match-tauri.pages.dev"
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge Cloudflare CDN cache
+        run: |
+          echo "正在清理 CDN 缓存: https://${{ github.event.inputs.domain }}/"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"files":["https://'"${DOMAIN}"'/"]}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ 缓存清理成功"
+          else
+            echo "❌ 缓存清理失败"
+            exit 1
+          fi
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          DOMAIN: ${{ github.event.inputs.domain }}
