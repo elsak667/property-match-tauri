@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
@@ -170,6 +170,7 @@ export default function PolicyPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [toast, setToast] = useState<Toast>({ type: "idle", message: "" });
   const [showAll, setShowAll] = useState(false);
+  const [hideExpired, setHideExpired] = useState(false);
   const [stats, setStats] = useState<{local数据库:number; 官方总数:number; 匹配率:string; 差异:number; 数据来源:string; 官方链接:string} | null>(null);
 
   // 加载浦易达官网统计
@@ -202,6 +203,12 @@ export default function PolicyPage() {
     });
     setResults(sorted);
   }, [policies]);
+
+  // 过滤结果（隐藏过期）
+  const filteredResults = useMemo(() => {
+    if (!hideExpired) return results;
+    return results.filter(r => !r.expired);
+  }, [results, hideExpired]);
 
   const showToast = useCallback((type: ToastType, message: string) => {
     setToast({ type, message });
@@ -296,8 +303,6 @@ export default function PolicyPage() {
         <div className="policy-hero-brand">
           <span className="policy-hero-title">政策匹配</span>
           <span className="policy-hero-sub">Policy Intelligence</span>
-          <div className="policy-hero-divider" />
-          <div className="policy-hero-tagline">精准筛选 · AI 驱动决策</div>
         </div>
         <div className="policy-hero-stats">
           <span className="policy-hero-stat">
@@ -423,19 +428,26 @@ export default function PolicyPage() {
             <div className="count">
               {isLoading
                 ? <>加载中...</>
-                : <>共找到 <strong>{results.length}</strong> 条政策，已选 <strong>{selected.size}</strong> 条</>
+                : <>共找到 <strong>{filteredResults.length}</strong> 条政策，已选 <strong>{selected.size}</strong> 条</>
               }
             </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              共 {policies.length} 条 · {fromFeishu ? "飞书数据" : "Mock数据"}
+              {hideExpired && filteredResults.length !== results.length && (
+                <span style={{ marginRight: 8 }}>（共 {results.length} 条，已隐藏 {results.length - filteredResults.length} 条过期）</span>
+              )}
+              {fromFeishu ? "飞书数据" : "Mock数据"}
+              <label style={{ marginLeft: 12, cursor: "pointer", color: "var(--primary)", textDecoration: "underline" }}>
+                <input type="checkbox" checked={hideExpired} onChange={e => setHideExpired(e.target.checked)} style={{ marginRight: 4 }} />
+                隐藏过期
+              </label>
             </div>
             <div className="legend">
-              {results.length > 5 && (
+              {filteredResults.length > 5 && (
                 <button
-                  style={{ fontSize: 12, padding: "2px 10px", cursor: "pointer", background: showAll ? "#e2e8f0" : "#3b6db5", color: showAll ? "#333" : "#fff", border: "none", borderRadius: 4 }}
+                  style={{ fontSize: 12, padding: "2px 10px", cursor: "pointer", background: showAll ? "#e2e8f0" : "var(--primary)", color: showAll ? "#333" : "#fff", border: "none", borderRadius: 4 }}
                   onClick={() => setShowAll(v => !v)}
                 >
-                  {showAll ? "收起 ▲" : `展开全部 ${results.length} 条 ▼`}
+                  {showAll ? "收起 ▲" : `展开全部 ${filteredResults.length} 条 ▼`}
                 </button>
               )}
             </div>
@@ -513,7 +525,7 @@ export default function PolicyPage() {
                 )}
               </div>
             ) : (
-              (showAll ? results : results.slice(0, 5)).map(item => (
+              (showAll ? filteredResults : filteredResults.slice(0, 5)).map(item => (
                 <PolicyCard
                   key={item.name ?? ""}
                   item={item}
@@ -534,9 +546,13 @@ export default function PolicyPage() {
         </main>
       </div>
 
-      <div className="footer-banner">
-        <div className="footer-warning"><Icon.alertWhite /> 本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</div>
-        <div className="footer-credit">浦发集团招商中心 · 仅供内部使用 · 技术支持：Els.J</div>
+      <div className="footer-row">
+        <span className="footer-disclaimer">本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</span>
+      </div>
+      <div className="footer-row">
+        <span>浦发集团招商中心</span>
+        <span className="footer-sep">·</span>
+        <span>技术支持：Els.J</span>
       </div>
     </div>
   );
