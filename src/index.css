@@ -2005,13 +2005,15 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   scrollbar-color: rgba(255,255,255,.1) transparent;
 }
 
-/* 右侧：地图 + 楼栋列表上下排列 */
+/* 右侧：地图 + 楼栋列表左右并排 */
 .cp-right-panel {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
   min-width: 0;
+  gap: 1px;
+  background: var(--border);
 }
 
 /* 搜索栏 */
@@ -2560,20 +2562,21 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 .cp-building-stats > span { display: flex; align-items: center; gap: 3px; }
 .cp-building-stats strong { color: var(--accent); font-weight: 700; }
 
-/* 地图（右侧面板顶部） */
+/* 地图（右侧面板左侧） */
 .cp-map-area {
-  flex-shrink: 0;
-  height: 260px;
+  flex: 1.2;
+  min-width: 0;
   overflow: hidden;
-  padding: 10px 10px 6px 4px;
+  padding: 8px 4px 8px 8px;
+  background: var(--bg-base);
 }
 
-/* 楼栋列表区域（右侧面板底部，可滚动） */
+/* 楼栋列表区域（右侧面板右侧） */
 .cp-list-area {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
-  min-height: 0;
-  background: white;
+  background: var(--bg-elevated);
 }
 
 /* 对比面板 */
@@ -2823,9 +2826,10 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 /* 响应式：移动端 */
 @media (max-width: 767px) {
   .cp-root { flex-direction: column; height: auto; }
-  .cp-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid rgba(59,109,181,.12); max-height: none; }
+  .cp-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); max-height: none; }
   .cp-right-panel { display: flex; flex-direction: column; }
-  .cp-map-area { height: 40vh; padding: 0 8px 8px; }
+  .cp-map-area { height: 40vh; flex: none; }
+  .cp-list-area { flex: none; height: 40vh; }
   .cp-section, .cp-ai-section, .cp-filter-panel { margin: 8px; }
   .cp-list, .cp-toolbar { padding-left: 8px; padding-right: 8px; }
 }
