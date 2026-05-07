@@ -5,7 +5,7 @@ import { usePolicies } from "../../lib/useFeishu";
 import { getPolicyStats } from "../../lib/tauri";
 import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
-import { trackExport, trackClick, trackSearch, trackDetail } from "../../lib/track";
+import { trackExport, trackClick, trackSearch, trackDetail, trackCopy } from "../../lib/track";
 
 function stripHtml(text: string): string {
   if (!text) return "";
@@ -38,6 +38,18 @@ function PolicyCard({
   const isSelected = selected.has(name);
   const daysLeft = item.days_left;
   const isUrgent = daysLeft > 0 && daysLeft <= 30;
+
+  async function handleCopy() {
+    const summary = `${item.name || ""}
+最高补贴：${item.amount_s || "—"}
+申报截止：${item.end_date ? item.end_date.substring(0, 10) : "长期有效"}
+发布单位：${item.dept || "—"}
+适用区域：${item.area || "浦东新区"}`;
+    try {
+      await navigator.clipboard.writeText(summary);
+      trackCopy(name);
+    } catch { /* ignore */ }
+  }
 
   return (
     <div
@@ -80,6 +92,15 @@ function PolicyCard({
       )}
       {isExpanded && (
         <div className="result-details">
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 12, padding: "2px 10px" }}
+              onClick={handleCopy}
+            >
+              📋 复制摘要
+            </button>
+          </div>
           <div className="detail-section">
             <div className="detail-title">基本信息</div>
             <div className="detail-grid">
