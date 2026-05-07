@@ -6,7 +6,7 @@ import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
 import { trackExport, trackClick, trackSearch, trackDetail, trackCopy } from "../../lib/track";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.198857.sbs";
 
 function stripHtml(text: string): string {
   if (!text) return "";
