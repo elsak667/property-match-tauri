@@ -665,15 +665,6 @@ async function getSheetData(sheetToken: string, sheetId: string, range?: string)
 }
 
 export async function getPolicySheetRows(): Promise<unknown[][]> {
-  if (import.meta.env.VITE_USE_WORKERS) {
-    const { fetchPoliciesFromFeishu } = await import("./workers");
-    const result = await fetchPoliciesFromFeishu();
-    // Transform SheetData back to unknown[][] format for loadPolicies()
-    return [result.headers, ...result.data.map(row =>
-      result.headers.map(h => row[h] ?? null)
-    )];
-  }
-  // Read from static JSON (CDN) — workers.ts handles fallback internally
   try {
     const { fetchPoliciesFromFeishu } = await import("./workers");
     const result = await fetchPoliciesFromFeishu();

@@ -88,6 +88,120 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   // 对比
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [recommendation, setRecommendation] = useState("");
+
+  function exportCompareReport() {
+    const fields: [string, (u: PropertyFilterResult["results"][number]) => string][] = [
+      ["园区", u => u.park_name || "—"],
+      ["产业方向", u => u.industry || "—"],
+      ["楼层", u => u.floor != null ? `第${u.floor}层` : "—"],
+      ["总面积", u => `${u.area_total?.toLocaleString() ?? "—"}㎡`],
+      ["空置面积", u => `${u.area_vacant?.toLocaleString() ?? "—"}㎡`],
+      ["层高", u => u.floor_height != null ? `${u.floor_height}m` : "—"],
+      ["荷载", u => u.load != null ? `${u.load}kN/㎡` : "—"],
+      ["配电", u => u.power_kv != null ? `${u.power_kv}kVA` : "—"],
+      ["租金", u => u.price != null ? `${u.price}元/㎡·天` : "—"],
+    ];
+    const colCount = compareUnits.length + 1;
+    const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+
+    const rows = fields.map(([label, fn]) => {
+      const cells = compareUnits.map(u => `<td>${fn(u)}</td>`).join("");
+      const isHighlight = label === "空置面积";
+      return `<tr><td class="label">${label}</td>${cells}</tr>`;
+    }).join("");
+
+    const bldThs = compareUnits.map(u =>
+      `<th>${u.building_name || u.building_id}</th>`
+    ).join("");
+
+    const recSection = recommendation
+      ? `<div class="rec-section"><div class="rec-title">推荐结论</div><div class="rec-content">${recommendation.replace(/\n/g, "<br>")}</div></div>`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f2ed; padding: 32px; }
+  .page { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.08); position: relative; }
+
+  /* 品牌头 */
+  .header { background: linear-gradient(135deg, #2d6a4f 0%, #1e5c3a 100%); padding: 24px 32px; display: flex; align-items: center; gap: 16px; position: relative; overflow: hidden; }
+  .header::after { content: ''; position: absolute; right: -20px; top: -20px; width: 160px; height: 160px; background: rgba(255,255,255,.05); border-radius: 50%; }
+  .brand { display: flex; flex-direction: column; }
+  .brand-main { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 2px; }
+  .brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: 1px; text-transform: uppercase; }
+  .header-divider { width: 2px; height: 36px; background: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.1)); }
+  .header-meta { flex: 1; }
+  .report-title { font-size: 20px; font-weight: 700; color: #fff; }
+  .report-date { font-size: 11px; color: rgba(255,255,255,.65); margin-top: 2px; }
+
+  /* 表格 */
+  .table-wrap { padding: 24px 32px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: linear-gradient(135deg, #2d6a4f, #3d9970); color: #fff; font-weight: 600; padding: 10px 12px; text-align: center; }
+  th:first-child { background: #1e5c3a; text-align: left; width: 100px; }
+  td { padding: 9px 12px; text-align: center; border-bottom: 1px solid #e8e4dc; color: #333; }
+  td:first-child { text-align: left; font-weight: 600; color: #2d6a4f; background: #f9f7f3; }
+  tr:last-child td { border-bottom: none; }
+
+  /* 推荐结论 */
+  .rec-section { margin: 0 32px 24px; background: #f9f7f3; border: 1.5px solid #2d6a4f; border-radius: 10px; padding: 16px 20px; }
+  .rec-title { font-size: 12px; font-weight: 700; color: #2d6a4f; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .rec-content { font-size: 13px; color: #444; line-height: 1.8; }
+
+  /* 页脚 */
+  .footer { background: #f5f2ed; padding: 16px 32px; border-top: 1px solid #e8e4dc; display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-size: 11px; color: #999; }
+  .footer-watermark { font-size: 11px; color: #2d6a4f; font-weight: 600; letter-spacing: 1px; }
+
+  /* 装饰线 */
+  .header::before { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #ff8c00, transparent); }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .page { box-shadow: none; border-radius: 0; }
+    @page { margin: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      <span class="brand-main">浦发集团招商平台</span>
+      <span class="brand-sub">Investment Platform</span>
+    </div>
+    <div class="header-divider"></div>
+    <div class="header-meta">
+      <div class="report-title">楼栋对比报告</div>
+      <div class="report-date">${today} · 浦发集团招商中心</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>指标</th>${bldThs}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+
+  ${recSection}
+
+  <div class="footer">
+    <span class="footer-left">本报告由浦发集团招商平台生成 · 仅供内部使用</span>
+    <span class="footer-watermark">浦发集团招商中心</span>
+  </div>
+</div>
+</body>
+</html>`;
+
+    openPrintHtmlRaw(html);
+  }
 
   // 园区折叠
   const [collapsedParks, setCollapsedParks] = useState<Set<string>>(new Set());
@@ -300,10 +414,10 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                 >
                   <div className="cp-ai-card-name">
                     <span>{p.building || p.name}</span>
-                    <span className="cp-score">{p.score}</span>
+                    <span className="cp-score">{Math.round(p.score * 100)}%</span>
                   </div>
                   <div className="cp-ai-card-meta">{p.park && <><Icon.mapPinAccent /> {p.park}</>}</div>
-                  <div className="cp-ai-card-reason">{p.match_reason}</div>
+                  <div className="cp-ai-card-reason"><span className="cp-reason-tag">匹配原因</span>{p.match_reason}</div>
                 </div>
               ))}
             </div>
@@ -457,6 +571,13 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             {filtering ? "筛选中..." : <><strong>{parkCount}</strong>个园区 <strong>{uniqueBuildingCount}</strong>栋楼</>}
           </span>
           <div className="cp-toolbar-right">
+            <button
+              className={"cp-btn-compare" + (compareMode ? " active" : "")}
+              onClick={() => setCompareMode(v => !v)}
+              title="勾选楼栋后可对比"
+            >
+              <Icon.chart /> {compareMode ? "退出对比" : "对比模式"}
+            </button>
             {compareIds.size >= 2 && (
               <button className="cp-btn-compare" onClick={() => setShowCompare(true)}>
                 <Icon.chart /> 对比 {compareIds.size}
@@ -499,9 +620,11 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
                             key={b.building_id}
                             className={["cp-building-card", isAi ? "ai-matched" : "", isActive ? "active" : "", isCompare ? "compare-selected" : ""].filter(Boolean).join(" ")}
                           >
-                            <div className="cp-building-check" onClick={e => { e.stopPropagation(); toggleCompare(b.building_id); }}>
-                              {isCompare ? "☑" : "☐"}
-                            </div>
+                            {(compareMode || isCompare) && (
+                              <div className="cp-building-check" onClick={e => { e.stopPropagation(); toggleCompare(b.building_id); }}>
+                                {isCompare ? "☑" : "☐"}
+                              </div>
+                            )}
                             <div className="cp-building-info" onClick={() => handleBuildingSelect(b.building_id)}>
                               <div className="cp-building-name">
                                 {b.name}
@@ -530,6 +653,23 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
       </div>
 
       {/* 详情面板 */}
+
+      {/* 对比浮动条 */}
+      {compareMode && (
+        <div className="cp-compare-float">
+          <span className="cp-compare-float-text">
+            已选 <strong>{compareIds.size}</strong> 个楼栋 {compareIds.size < 2 ? "（再选1个即可对比）" : "，开始对比"}
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => { setCompareIds(new Set()); }}>清空</button>
+            {compareIds.size >= 2 && (
+              <button className="btn-primary" style={{ fontSize: 12, padding: "6px 16px" }} onClick={() => setShowCompare(true)}>
+                <Icon.chart /> 开始对比
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {selectedBuildingId && (
         <BuildingDetailPanel buildingId={selectedBuildingId} onClose={() => setSelectedBuildingId(null)} />
       )}
@@ -541,33 +681,21 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             <div className="cp-compare-header">
               <span><Icon.chartAccent /> 楼栋对比</span>
               <div className="cp-compare-actions">
-                <button className="cp-btn-export" onClick={() => {
-                  const fields: [string, (u: PropertyFilterResult["results"][number]) => string][] = [
-                    ["园区", u => u.park_name || "—"],
-                    ["产业", u => u.industry || "—"],
-                    ["楼层", u => u.floor != null ? `第${u.floor}层` : "—"],
-                    ["总面积", u => `${u.area_total?.toLocaleString() ?? "—"}㎡`],
-                    ["空置面积", u => `${u.area_vacant?.toLocaleString() ?? "—"}㎡`],
-                    ["层高", u => u.floor_height != null ? `${u.floor_height}m` : "—"],
-                    ["荷载", u => u.load != null ? `${u.load}kN/㎡` : "—"],
-                    ["配电", u => u.load != null ? `${u.load}kVA` : "—"],
-                    ["租金", u => u.price != null ? `${u.price}元/㎡·天` : "—"],
-                  ];
-                  const rows = compareUnits.map(u =>
-                    `<tr>${fields.map(([, fn]) => `<td style="padding:8px;border:1px solid #ddd">${fn(u)}</td>`).join("")}</tr>`
-                  ).join("");
-                  const bldNames = compareUnits.map(u => `<th style="padding:8px;border:1px solid #ddd;background:#3b6db5;color:white;font-weight:700">${u.building_name}</th>`).join("");
-                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{padding:24px}table{border-collapse:collapse;width:100%}th,td{padding:8px;border:1px solid #ddd;font-size:13px}</style></head><body>
-                    <h1 style="color:#3b6db5">楼栋对比</h1>
-                    <table><thead><tr><th style="padding:8px;border:1px solid #ddd;background:#eef2ff">指标</th>${bldNames}</tr></thead><tbody>${rows}</tbody></table>
-                    <p style="margin-top:20px;color:#999;font-size:12px">${new Date().toLocaleString("zh-CN")} · 浦发集团招商平台</p>
-                  </body></html>`;
-                  openPrintHtmlRaw(html);
-                }}><Icon.downloadWhite /> 导出</button>
-                <button className="cp-close-btn" onClick={() => setShowCompare(false)}><Icon.closeSm /> 关闭</button>
+                <button className="cp-btn-export" onClick={exportCompareReport}><Icon.downloadWhite /> 导出报告</button>
+                <button className="cp-close-btn" onClick={() => { setShowCompare(false); setRecommendation(""); }}><Icon.closeSm /> 关闭</button>
               </div>
             </div>
             <div className="cp-compare-body">
+              <div className="cp-compare-recommend">
+                <label className="cp-recommend-label"><Icon.lightbulb /> 推荐结论</label>
+                <textarea
+                  className="cp-recommend-input"
+                  placeholder="填写推荐结论，如：综合以上楼栋条件，推荐优先考虑XX楼，空置面积最大，租金性价比最高，适合XX产业..."
+                  value={recommendation}
+                  onChange={e => setRecommendation(e.target.value)}
+                  rows={3}
+                />
+              </div>
               <table className="cp-compare-table">
                 <thead>
                   <tr><th>指标</th>{compareUnits.map(u => <th key={u.building_id}>{u.building_name}</th>)}</tr>

@@ -92,7 +92,18 @@ const PREF_QUESTIONS = [
 
 // ── 辅助函数 ────────────────────────────────────────────────────────────────
 async function aiSearch(q: string): Promise<AiSearchResult> {
-  const res = await fetch(`${BASE}/ai/search?q=${encodeURIComponent(q)}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/ai/search?q=${encodeURIComponent(q)}`, {
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "TimeoutError") {
+      throw new Error("AI 请求超时，请稍后重试");
+    }
+    throw new Error("网络连接失败，请检查网络后重试");
+  }
+  if (!res.ok) throw new Error(`服务器错误：${res.status}`);
   const data = await res.json() as { success?: boolean; data?: AiSearchResult; error?: string };
   if (!data?.success) throw new Error(data?.error || "AI 解析失败");
   return data.data ?? { policies: [], properties: [], summary: "" };

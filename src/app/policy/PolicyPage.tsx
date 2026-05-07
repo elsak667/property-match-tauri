@@ -166,7 +166,6 @@ export default function PolicyPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [companyName, setCompanyName] = useState("");
-  const [showExport, setShowExport] = useState(false);
   const [matchLoading, setMatchLoading] = useState(false);
   const [toast, setToast] = useState<Toast>({ type: "idle", message: "" });
   const [showAll, setShowAll] = useState(false);
@@ -208,22 +207,20 @@ export default function PolicyPage() {
   const doMatch = useCallback(() => {
     trackSearch(query);
     setMatchLoading(true);
-    setTimeout(() => {
-      const filtered = filterPolicies(policies, {
-        query,
-        industry: industries[0] || "",
-        location,
-        dept,
-        caps,
-      });
-      const sorted = [...filtered].sort((a, b) => {
-        const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
-        const tb = b.zcReleaseTime ? new Date(b.zcReleaseTime).getTime() : 0;
-        return tb - ta;
-      });
-      setResults(sorted);
-      setMatchLoading(false);
-    }, 300);
+    const filtered = filterPolicies(policies, {
+      query,
+      industry: industries[0] || "",
+      location,
+      dept,
+      caps,
+    });
+    const sorted = [...filtered].sort((a, b) => {
+      const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
+      const tb = b.zcReleaseTime ? new Date(b.zcReleaseTime).getTime() : 0;
+      return tb - ta;
+    });
+    setResults(sorted);
+    setMatchLoading(false);
   }, [policies, query, industries, location, dept, caps]);
 
   const handleToggleExpand = useCallback((name: string) => {
@@ -467,7 +464,6 @@ export default function PolicyPage() {
           
           <div className="form-actions">
             <button className="btn-secondary" onClick={resetAll}>重置全部</button>
-            <button className="btn-primary" onClick={doMatch}>开始匹配</button>
           </div>
           {activeFiltersCount > 0 && (
             <div className="filter-count">已选 {activeFiltersCount} 个筛选条件</div>
@@ -497,10 +493,9 @@ export default function PolicyPage() {
             </div>
           </div>
 
-          {showExport && (
-            <div className="export-panel">
-              <div className="export-title">导出政策清单</div>
-              <div className="export-row">
+          {results.length > 0 && selected.size > 0 && (
+            <div className="content-footer">
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <input
                   id="company-input"
                   type="text"
@@ -509,15 +504,15 @@ export default function PolicyPage() {
                   value={companyName}
                   onChange={e => setCompanyName(e.target.value)}
                   maxLength={50}
-                  style={{ maxWidth: "200px" }}
+                  style={{ maxWidth: "180px", padding: "6px 10px", border: "1.5px solid var(--border-hi)", borderRadius: 8, fontSize: 12 }}
                 />
-                <button className="btn-primary" onClick={exportPdf} disabled={selected.size === 0}>
-                  打印导出 ({selected.size} 条)
+                <button className="btn-primary" onClick={exportPdf}>
+                  📥 导出 {selected.size} 条政策
                 </button>
                 <button className="btn-secondary" onClick={selectAll}>全选</button>
                 <button className="btn-secondary" onClick={clearSelection}>清空</button>
-                <button className="btn-secondary" onClick={() => setShowExport(false)}>收起</button>
               </div>
+              <button className="btn-secondary" onClick={doMatch}><Icon.refreshAccent /> 刷新结果</button>
             </div>
           )}
 
@@ -556,11 +551,17 @@ export default function PolicyPage() {
               <div className="empty-state">
                 <div className="empty-icon"><Icon.file /></div>
                 <p>未找到匹配政策</p>
-                <small>试试调整筛选条件</small>
-                {hasFilters && (
-                  <button className="btn-secondary" onClick={resetAll} style={{ marginTop: "12px" }}>
-                    重置筛选
-                  </button>
+                {hasFilters ? (
+                  <>
+                    <small>试试调整筛选条件，或缩短关键词</small>
+                    <button className="btn-secondary" onClick={resetAll} style={{ marginTop: "12px" }}>
+                      重置筛选
+                    </button>
+                  </>
+                ) : query.trim() ? (
+                  <small>试试缩短关键词，如只保留核心行业词</small>
+                ) : (
+                  <small>选择筛选条件后再试</small>
                 )}
               </div>
             ) : (
@@ -577,12 +578,9 @@ export default function PolicyPage() {
             )}
           </div>
 
-          {results.length > 0 && (
+          {results.length > 0 && selected.size === 0 && (
             <div className="content-footer">
-              {!showExport && (
-                <button className="btn-primary" onClick={() => setShowExport(true)}>📥 导出/打印政策</button>
-              )}
-              <button className="btn-secondary" onClick={doMatch}><Icon.refreshAccent /> 重新匹配</button>
+              <button className="btn-primary" onClick={doMatch}><Icon.refreshAccent /> 刷新结果</button>
             </div>
           )}
         </main>
