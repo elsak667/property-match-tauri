@@ -290,6 +290,79 @@ export default function PolicyPage() {
         </div>
       )}
 
+      {/* Hero Banner */}
+      <div className="policy-hero-banner">
+        <div className="policy-hero-brand">
+          <span className="policy-hero-title">政策匹配</span>
+          <span className="policy-hero-sub">Policy Intelligence</span>
+          <div className="policy-hero-divider" />
+          <div className="policy-hero-tagline">智能检索 · 精准筛选 · AI 驱动决策</div>
+        </div>
+        <div className="policy-hero-stats">
+          <span className="policy-hero-stat">
+            <strong>{policies.length}</strong>
+            <span>政策</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong>{options.industries.length}</strong>
+            <span>产业方向</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong>{results.length}</strong>
+            <span>当前匹配</span>
+          </span>
+        </div>
+      </div>
+
+      {/* 快速筛选 Chips */}
+      <div className="quick-chips">
+        <span className="quick-chips-label"><Icon.zapAccent /> 快速筛选</span>
+        <div className="chips-row">
+          {/* 全部重置 */}
+          {hasFilters && (
+            <button className="chip-btn chip-reset" onClick={resetAll}>
+              <Icon.xCircle /> 重置
+            </button>
+          )}
+          {/* 即将截止 */}
+          <button
+            className={`chip-btn${query === "即将截止" ? " active" : ""}`}
+            onClick={() => setQuery(query === "即将截止" ? "" : "即将截止")}
+          >
+            <Icon.zapAccent /> 即将截止
+          </button>
+          {/* 补贴金额高 */}
+          <button
+            className={`chip-btn${caps.includes("high") ? " active" : ""}`}
+            onClick={() => toggleTag(caps, setCaps, "high")}
+          >
+            <Icon.lightbulb /> 高额补贴
+          </button>
+          {/* 产业方向 chips */}
+          {options.industries.slice(0, 4).map(ind => (
+            <button
+              key={ind.k}
+              className={`chip-btn${industries.includes(ind.k) ? " active" : ""}`}
+              onClick={() => toggleTag(industries, setIndustries, ind.k)}
+            >
+              <Icon.industry /> {ind.l}
+            </button>
+          ))}
+          {/* 区域 chips */}
+          {options.locations.slice(0, 3).map(loc => (
+            <button
+              key={loc.k}
+              className={`chip-btn${location === loc.k ? " active" : ""}`}
+              onClick={() => setLocation(location === loc.k ? "" : loc.k)}
+            >
+              <Icon.mapPinAccent /> {loc.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {stats && (
         <div className="stats-bar">
           <span className="stats-bar-label"><Icon.chartAccent /> 数据对比</span>
@@ -447,6 +520,31 @@ export default function PolicyPage() {
               </div>
             </div>
           )}
+
+          {/* 即将到期政策高亮区 */}
+          {(() => {
+            const urgent = policies.filter(p => p.days_left > 0 && p.days_left <= 30 && !p.expired);
+            if (urgent.length === 0) return null;
+            return (
+              <div className="urgent-section">
+                <div className="urgent-header">
+                  <Icon.zapAccent /> <span>本月即将截止</span>
+                  <span className="urgent-count">{urgent.length} 条</span>
+                </div>
+                <div className="urgent-cards">
+                  {urgent.slice(0, 3).map(p => (
+                    <div key={p.name} className="urgent-card" onClick={() => handleToggleExpand(p.name || "")}>
+                      <div className="urgent-card-name">{p.name}</div>
+                      <div className="urgent-card-meta">
+                        <span>{p.amount_s || "—"}</span>
+                        <span className="urgent-days">{p.days_left} 天后截止</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="result-list">
             {isLoading ? (
