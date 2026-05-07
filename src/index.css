@@ -2020,8 +2020,8 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   gap: 8px;
   align-items: center;
   padding: 12px 14px 10px;
-  background: white;
-  border-bottom: 1px solid rgba(59, 109, 181, .08);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .cp-search-input-wrap {
@@ -2117,12 +2117,12 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 
 /* 通用区块卡片 */
 .cp-section {
-  background: white;
+  background: var(--bg-surface);
   margin: 10px 12px 0;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 10px 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04), 0 0 0 1px rgba(0,0,0,.04);
-  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 2px 8px rgba(45,106,79,.06);
+  border: 1px solid var(--border);
 }
 .cp-section-label {
   display: flex;
@@ -2137,7 +2137,7 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 .cp-section-label span:first-child { font-size: 13px; }
 .cp-section-label span:nth-child(2) { color: #1e293b; }
 .cp-badge {
-  background: linear-gradient(135deg, var(--accent), #5b8fd9);
+  background: linear-gradient(135deg, var(--primary), #4db87a);
   color: white;
   font-size: 9px;
   font-weight: 700;
@@ -2147,34 +2147,47 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 
 /* AI 推荐区 */
 .cp-ai-section {
-  background: linear-gradient(135deg, #eff6ff, #f0f9ff);
-  border: 1.5px solid rgba(59,109,181,.2);
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(45,106,79,.06), rgba(45,106,79,.03));
+  border: 1.5px solid rgba(45,106,79,.15);
+  border-radius: var(--radius);
   padding: 10px 12px;
   margin: 10px 12px 0;
-  box-shadow: 0 2px 8px rgba(59,109,181,.08);
+  box-shadow: 0 2px 8px rgba(45,106,79,.08);
 }
 .cp-ai-cards { display: flex; flex-direction: column; gap: 6px; }
 .cp-ai-card {
   background: white;
-  border: 1.5px solid #bfdbfe;
-  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
   padding: 10px 12px;
   cursor: pointer;
-  transition: all .18s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: all .2s;
+  box-shadow: 0 2px 8px rgba(45,106,79,.06);
+  position: relative;
+  overflow: hidden;
+}
+.cp-ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), #4db87a 60%, transparent);
+  transform: scaleX(0);
+  transition: transform .25s ease;
 }
 .cp-ai-card:hover {
-  border-color: var(--accent);
-  background: #f8faff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59,109,181,.12);
+  border-color: rgba(45,106,79,.2);
+  background: rgba(45,106,79,.03);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(45,106,79,.15);
 }
+.cp-ai-card:hover::before { transform: scaleX(1); }
 .cp-ai-card.active {
-  border-color: var(--accent);
-  background: #eef2ff;
-  box-shadow: 0 0 0 3px rgba(59,109,181,.15), 0 4px 12px rgba(59,109,181,.12);
+  border-color: var(--primary);
+  background: rgba(45,106,79,.05);
+  box-shadow: 0 0 0 3px rgba(45,106,79,.12), 0 6px 20px rgba(45,106,79,.15);
 }
+.cp-ai-card.active::before { transform: scaleX(1); }
 .cp-ai-card-name {
   display: flex;
   justify-content: space-between;
@@ -2183,7 +2196,7 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 }
 .cp-ai-card-name > span:first-child { font-size: 13px; font-weight: 600; color: #1e293b; }
 .cp-score {
-  background: linear-gradient(135deg, var(--accent), #7c5cbf);
+  background: linear-gradient(135deg, var(--primary), #4db87a);
   color: white;
   font-size: 11px;
   font-weight: 700;
@@ -2284,20 +2297,20 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 
 /* 专业筛选面板 */
 .cp-filter-panel {
-  background: white;
-  border: 1.5px solid rgba(59,109,181,.15);
-  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-hi);
+  border-radius: var(--radius);
   margin: 10px 12px 0;
   padding: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  box-shadow: 0 2px 8px rgba(45,106,79,.08);
 }
 .cp-filter-panel-title {
   font-size: 13px;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--primary);
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1.5px solid rgba(59,109,181,.1);
+  border-bottom: 1.5px solid var(--border);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2466,26 +2479,37 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   align-items: flex-start;
   gap: 8px;
   background: white;
-  border: 1.5px solid rgba(0,0,0,.06);
-  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
   padding: 10px 12px;
   cursor: pointer;
-  transition: all .15s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: all .2s;
+  box-shadow: 0 2px 8px rgba(45,106,79,.06);
+  position: relative;
+  overflow: hidden;
+}
+.cp-building-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), #4db87a 60%, transparent);
+  transform: scaleX(0);
+  transition: transform .25s ease;
 }
 .cp-building-card:hover {
-  border-color: rgba(59,109,181,.3);
-  background: #f8faff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59,109,181,.1);
+  border-color: rgba(45,106,79,.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(45,106,79,.15);
 }
+.cp-building-card:hover::before { transform: scaleX(1); }
 .cp-building-card.active {
   border-color: var(--accent);
   background: #eef2ff;
   box-shadow: 0 0 0 3px rgba(59,109,181,.12), 0 4px 12px rgba(59,109,181,.1);
 }
-.cp-building-card.ai-matched { border-color: #93c5fd; background: #f5f8ff; }
-.cp-building-card.compare-selected { border-color: #059669; background: #f0fdf4; }
+.cp-building-card.ai-matched { border-color: rgba(45,106,79,.3); background: rgba(45,106,79,.04); }
+.cp-building-card.compare-selected { border-color: var(--primary); background: rgba(45,106,79,.06); }
 .cp-building-check {
   font-size: 16px;
   flex-shrink: 0;
