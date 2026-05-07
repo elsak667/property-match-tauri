@@ -297,7 +297,7 @@ export default function PolicyPage() {
           <span className="policy-hero-title">政策匹配</span>
           <span className="policy-hero-sub">Policy Intelligence</span>
           <div className="policy-hero-divider" />
-          <div className="policy-hero-tagline">数据来源：{stats?.数据来源 || "加载中..."}</div>
+          <div className="policy-hero-tagline">精准筛选 · AI 驱动决策</div>
         </div>
         <div className="policy-hero-stats">
           <span className="policy-hero-stat">
@@ -323,54 +323,6 @@ export default function PolicyPage() {
           </span>
         </div>
       </div>
-
-      {/* 快速筛选 Chips */}
-      <div className="quick-chips">
-        <span className="quick-chips-label"><Icon.zapAccent /> 快速筛选</span>
-        <div className="chips-row">
-          {/* 全部重置 */}
-          {hasFilters && (
-            <button className="chip-btn chip-reset" onClick={resetAll}>
-              <Icon.xCircle /> 重置
-            </button>
-          )}
-          {/* 即将截止 */}
-          <button
-            className={`chip-btn${query === "即将截止" ? " active" : ""}`}
-            onClick={() => setQuery(query === "即将截止" ? "" : "即将截止")}
-          >
-            <Icon.zapAccent /> 即将截止
-          </button>
-          {/* 补贴金额高 */}
-          <button
-            className={`chip-btn${caps.includes("high") ? " active" : ""}`}
-            onClick={() => toggleTag(caps, setCaps, "high")}
-          >
-            <Icon.lightbulb /> 高额补贴
-          </button>
-          {/* 产业方向 chips */}
-          {options.industries.slice(0, 4).map(ind => (
-            <button
-              key={ind.k}
-              className={`chip-btn${industries.includes(ind.k) ? " active" : ""}`}
-              onClick={() => toggleTag(industries, setIndustries, ind.k)}
-            >
-              <Icon.industry /> {ind.l}
-            </button>
-          ))}
-          {/* 区域 chips */}
-          {options.locations.slice(0, 3).map(loc => (
-            <button
-              key={loc.k}
-              className={`chip-btn${location === loc.k ? " active" : ""}`}
-              onClick={() => setLocation(location === loc.k ? "" : loc.k)}
-            >
-              <Icon.mapPinAccent /> {loc.l}
-            </button>
-          ))}
-        </div>
-      </div>
-
 
       <div className="main-layout">
         <aside className="sidebar">
