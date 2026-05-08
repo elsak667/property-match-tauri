@@ -123,7 +123,28 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
 
       {/* ── 主体：左侧快讯 + 右侧模块 ── */}
       <div className="home-body">
-        {/* 左侧：产业快讯（垂直列表） */}
+        {/* 移动端横向跑马灯（桌面端隐藏） */}
+        <div className="home-news-ticker-mobile">
+          <div className="news-ticker-header">
+            <span className="news-panel-icon"><Icon.newspaper /></span>
+            <span className="news-panel-label">产业快讯</span>
+          </div>
+          <div className="news-ticker-track">
+            {recent.map((item, i) => (
+              <div key={i} className="news-ticker-item">
+                <span
+                  className="news-panel-cat"
+                  style={{ background: NEWS_COLORS[item.category] || "#94a3b8" }}
+                >
+                  {item.category}
+                </span>
+                <span className="news-panel-time">{item.time.split(" ")[0]}</span>
+                <span className="news-ticker-title">{item.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* 左侧：产业快讯（垂直列表，桌面端显示） */}
         <div className="home-news-panel">
           <div className="news-panel-header">
             <span className="news-panel-icon"><Icon.newspaper /></span>
