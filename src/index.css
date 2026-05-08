@@ -2035,7 +2035,7 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   .bdp-loading, .bdp-error { padding: 20px; text-align: center; color: #888; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; }
 
   /* ─── Carrier Page Mobile Fixes ─── */
-  .cp-root { height: calc(100vh - 80px) !important; }
+  .cp-root { height: calc(100vh - 80px) !important; --cp-root-height: calc(100vh - 80px) !important; }
   .cp-compare-float { bottom: 90px; padding: 8px 12px; gap: 8px; max-width: calc(100vw - 32px); overflow: hidden; }
   .cp-compare-float-text { font-size: 12px; }
   .cp-compare-overlay { align-items: flex-end; }
@@ -2897,11 +2897,11 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 
 /* 响应式：移动端 */
 @media (max-width: 767px) {
-  .cp-root { flex-direction: column; height: auto; max-height: 100vh; overflow: hidden; }
+  .cp-root { flex-direction: column; height: var(--cp-root-height, calc(100vh - 120px)); max-height: 100vh; overflow: hidden; }
   .cp-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); max-height: none; overflow-y: auto; }
-  .cp-right-panel { display: flex; flex-direction: column; }
+  .cp-right-panel { display: flex; flex-direction: column; height: calc(100vh - 180px); }
   .cp-map-area { height: 40vh; flex: none; width: 100%; }
-  .cp-list-area { flex: none; height: 40vh; width: 100%; }
+  .cp-list-area { flex: 1; width: 100%; overflow-y: auto; }
   .cp-section, .cp-ai-section, .cp-filter-panel { margin: 8px; }
   .cp-list, .cp-toolbar { padding-left: 8px; padding-right: 8px; }
 }
