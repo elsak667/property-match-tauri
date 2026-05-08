@@ -367,7 +367,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   }
 
   return (
-    <div className="cp-root" style={{ display: 'flex', height: 'var(--cp-root-height, calc(100vh - 120px))', overflow: 'hidden', background: 'var(--bg-base)' }}>
+    <div className="cp-root" style={{ display: 'flex', height: 'var(--cp-root-height, calc(100vh - 120px))', overflow: 'hidden', background: 'var(--bg-base)', flexDirection: 'column' }}>
       {/* ── 品牌 Hero 横条 ── */}
       <div className="cp-hero-banner">
         <div className="cp-hero-brand">
@@ -375,7 +375,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           <span className="cp-hero-sub">Property Intelligence</span>
         </div>
         <div className="cp-hero-divider" />
-        <div className="cp-hero-tagline">金桥园区载体可视化 · 智能筛选推荐</div>
+        <div className="cp-hero-tagline">载体可视化 · 智能筛选推荐</div>
         <div className="cp-hero-divider" />
         <div className="cp-hero-stats">
           <span className="cp-hero-stat"><strong>{totalBldCount}</strong> 楼栋</span>
@@ -383,6 +383,8 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           <span className="cp-hero-stat"><strong>{parkCount}</strong> 园区</span>
         </div>
       </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* 左侧 */}
       <div className="cp-sidebar">
         {/* 搜索栏 */}
