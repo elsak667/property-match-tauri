@@ -52,12 +52,31 @@ def read_sheet(token, range_str="A2:E200"):
 
 def append_rows(token, rows, start_row=2):
     """Append rows starting at start_row (1-indexed, sheet row)."""
+    if not rows:
+        return True
     url = f"{SHEET_URL}/{NEWS_SHEET_TOKEN}/values"
     col_letter = chr(65 + len(rows[0]) - 1)
     payload = {
         "valueRange": {
             "range": f"{NEWS_SHEET_ID}!A{start_row}:{col_letter}{start_row - 1 + len(rows)}",
             "values": rows
+        }
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(url, data=data,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="PUT")
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        result = json.load(resp)
+    return result.get("code") == 0
+
+def clear_sheet(token):
+    """Clear all data from row 2 onwards."""
+    url = f"{SHEET_URL}/{NEWS_SHEET_TOKEN}/values"
+    payload = {
+        "valueRange": {
+            "range": f"{NEWS_SHEET_ID}!A2:Z1000",
+            "values": [[] for _ in range(999)]
         }
     }
     data = json.dumps(payload).encode()
@@ -176,58 +195,33 @@ def parse_news(html: str, limit: int):
 def main():
     parser = argparse.ArgumentParser(description="张通社新闻抓取 → 飞书表格")
     parser.add_argument("--dry-run", action="store_true", help="只打印不写入")
-    parser.add_argument("--limit", type=int, default=50, help="最多抓取条数")
-    parser.add_argument("--force", action="store_true", help="强制重写全部数据（忽略已存在判断）")
+    parser.add_argument("--limit", type=int, default=20, help="最多抓取条数（默认20）")
     args = parser.parse_args()
 
     token = get_token()
 
-    if args.force:
-        news_items = fetch_news(args.limit)
-        print(f"抓取到 {len(news_items)} 条")
-        rows = [[n["time"], n["category"], n["title"], n["link"], n["summary"]] for n in news_items]
-        success = append_rows(token, rows)
-        if success:
-            print(f"✅ 成功写入 {len(news_items)} 条到飞书表格")
-        else:
-            print("❌ 写入飞书失败")
-            sys.exit(1)
-        return
-
-    existing = read_sheet(token)
-    existing_titles = {normalize_title(row[2].strip()) for row in existing if len(row) >= 3 and row[2]}
-    print(f"已有 {len(existing_titles)} 条记录")
-
     news_items = fetch_news(args.limit)
     print(f"抓取到 {len(news_items)} 条")
 
-    new_items = [n for n in news_items if n["title"] not in existing_titles]
-    print(f"新增 {len(new_items)} 条")
-
-    if not new_items:
-        print("没有新增内容，退出")
-        return
-
-    print(f"新增 {len(new_items)} 条（不过滤日期）")
-
-    if not new_items:
-        print("没有新增内容，退出")
-        return
-
     if args.dry_run:
-        print("\n=== 预览新增条目 ===")
-        for item in new_items[:10]:
+        print("\n=== 预览最新条目 ===")
+        for item in news_items[:10]:
             print(f"  [{item['time']}] [{item['category']}] {item['title']}")
         return
 
-    # Compute next empty row: existing data + header row (row 1) + 1-based index
-    next_row = len(existing_titles) + 2
-    rows = [[n["time"], n["category"], n["title"], n["link"], n["summary"]] for n in new_items]
-    success = append_rows(token, rows, start_row=next_row)
+    # Full replacement: clear sheet and write latest 20
+    print("清空表格并写入最新20条...")
+    success = clear_sheet(token)
+    if not success:
+        print("❌ 清空飞书表格失败")
+        sys.exit(1)
+
+    rows = [[n["time"], n["category"], n["title"], n["link"], n["summary"]] for n in news_items]
+    success = append_rows(token, rows, start_row=2)
     if success:
-        print(f"\n✅ 成功写入 {len(new_items)} 条到飞书表格")
+        print(f"✅ 成功写入 {len(news_items)} 条到飞书表格（已清空旧数据）")
     else:
-        print("\n❌ 写入飞书失败")
+        print("❌ 写入飞书失败")
         sys.exit(1)
 
 if __name__ == "__main__":
