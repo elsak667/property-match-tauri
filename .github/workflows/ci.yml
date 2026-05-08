@@ -24,4 +24,4 @@ jobs:
       - name: TypeScript check & Build
         run: npm run build
         env:
-          VITE_USE_WORKERS: "false"
+          VITE_USE_WORKERS: "true"
