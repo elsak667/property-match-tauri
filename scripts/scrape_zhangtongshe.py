@@ -80,9 +80,23 @@ def fetch_news(limit=50):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto("https://www.zhangtongshe.com/news", wait_until="networkidle", timeout=30000)
-        for _ in range(5):
+
+        # Try to click "load more" button multiple times to load all news
+        for _ in range(10):
+            # Scroll to bottom first
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
+
+            # Try to find and click "load more" / "加载更多" button
+            try:
+                load_more = page.get_by_text("加载更多", exact=False)
+                if load_more.is_visible():
+                    load_more.click()
+                    page.wait_for_timeout(1000)
+                    print("Clicked '加载更多' button...")
+            except Exception:
+                pass
+
         text = page.inner_text("body")
         browser.close()
     return parse_news(text, limit)
