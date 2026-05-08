@@ -666,6 +666,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         </div>
       </div>
       </div>
+      </div>
 
       {/* 详情面板 */}
 
