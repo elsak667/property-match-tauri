@@ -1,4 +1,4 @@
-name: 张通社新闻抓取
+name: "张通社新闻抓取"
 
 on:
   workflow_dispatch:
