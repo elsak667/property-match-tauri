@@ -1,5 +1,28 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #e8eef5; color: #1c1c1e; min-height: 100vh; }
+body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 16px; background: #e8eef5; color: #1c1c1e; min-height: 100vh; transition: font-size .2s ease; }
+body.font-large { }
+body.font-large .result-name { font-size: 20px !important; font-weight: 800 !important; }
+body.font-large .result-park { font-size: 16px !important; }
+body.font-large .stats-item-num { font-size: 26px !important; }
+body.font-large .search-input { font-size: 16px !important; }
+body.font-large .count { font-size: 16px !important; }
+body.font-large .tag-btn { font-size: 15px !important; }
+body.font-large .filter-label { font-size: 14px !important; }
+body.font-large .meta-date { font-size: 14px !important; }
+body.font-large .urgent-card-name { font-size: 16px !important; }
+body.font-large .result-meta { font-size: 15px !important; }
+body.font-large .font-toggle-icon { font-weight: 800; }
+body.font-large .font-toggle-icon.large { font-weight: 700; }
+
+.font-toggle-btn {
+  display: flex; align-items: center; gap: 2px;
+  background: rgba(255,255,255,.7); border: 1.5px solid rgba(59,109,181,.2);
+  border-radius: 8px; padding: 4px 8px; cursor: pointer;
+  transition: all .2s; color: #64748b; margin-right: 8px;
+}
+.font-toggle-btn:hover { border-color: #3b6db5; color: #3b6db5; }
+.font-toggle-icon { font-size: 11px; font-weight: 600; line-height: 1; }
+.font-toggle-icon.large { font-size: 14px; }
 .container { max-width: 1280px; margin: 0 auto; padding: 16px; }
 
 /* ─── Layout ─── */
