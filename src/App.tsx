@@ -20,8 +20,25 @@ export default function App() {
   useEffect(() => {
     if (fontLarge) {
       document.body.classList.add("font-large");
+      // 强制覆盖内联 fontSize（内联样式优先级高于 class，需用 JS 逐元素覆盖）
+      document.querySelectorAll("[style*='font-size']").forEach(el => {
+        const htmlEl = el as HTMLElement;
+        const current = htmlEl.style.fontSize;
+        if (!current) return;
+        const base = parseInt(current);
+        if (isNaN(base)) return;
+        const scaled = Math.min(base * 1.25, base + 4);
+        htmlEl.dataset["origFontSize"] = current;
+        htmlEl.style.fontSize = `${scaled}px`;
+      });
     } else {
       document.body.classList.remove("font-large");
+      // 恢复原始内联 fontSize
+      document.querySelectorAll("[data-orig-font-size]").forEach(el => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.fontSize = htmlEl.dataset["origFontSize"] || "";
+        delete htmlEl.dataset["origFontSize"];
+      });
     }
   }, [fontLarge]);
 
@@ -57,6 +74,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    (window as unknown as Record<string, unknown>).__toggleFont__ = toggleFontSize;
+  }, [fontLarge]);
+
+  useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
       if (["home", "property", "policy", "placeholder-invest", "placeholder-industry"].includes(page)) {
         setCurrentPage(page as Page);
@@ -68,7 +89,7 @@ export default function App() {
   return (
     <div className="app-wrapper">
       <div className="app-main">
-        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} onToggleFont={toggleFontSize} />
+        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
         <div className="container">
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
@@ -108,7 +129,7 @@ interface NavBarProps {
   onToggleFont?: () => void;
 }
 
-function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
+function NavBar({ currentPage, onNavigate }: NavBarProps) {
   return (
     <div className="navbar">
       <div className="navbar-brand">
@@ -130,7 +151,7 @@ function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
         ))}
       </nav>
       <div className="navbar-right">
-        <button className="font-toggle-btn" onClick={onToggleFont} title="切换字号">
+        <button className="font-toggle-btn" onClick={() => ((window as unknown as Record<string, unknown>).__toggleFont__ as (() => void) | undefined)?.()} title="切换字号">
           <span className="font-toggle-icon">A</span>
           <span className="font-toggle-icon large">A</span>
         </button>

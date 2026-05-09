@@ -1,10 +1,4 @@
-// 飞书 API 集成层
-
-const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-const POLICY_SHEET_ID = "0aad30";
-
-interface TenantToken { token: string; expiresAt: number; }
-let cachedToken: TenantToken | null = null;
+// 飞书 API 集成层（静态 JSON 模式）
 
 export class FeishuCredentialsMissing extends Error {
   constructor() {
@@ -13,85 +7,42 @@ export class FeishuCredentialsMissing extends Error {
   }
 }
 
-async function getTenantToken(): Promise<string> {
-  const now = Date.now();
-  if (cachedToken && now < cachedToken.expiresAt - 300000) {
-    return cachedToken.token;
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  try {
-    const token: string = await invoke("feishu_token", {});
-    cachedToken = { token, expiresAt: now + 3600 * 1000 };
-    return token;
-  } catch (e: unknown) {
-    const msg = String(e);
-    if (msg.includes("not set") || msg.includes("未设置") || msg.includes("missing")) {
-      throw new FeishuCredentialsMissing();
-    }
-    throw e;
-  }
+// ── 静态 JSON 加载 ─────────────────────────────────────────────────────────
+
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+  return res.json();
 }
 
-async function getSheetData(sheetToken: string, sheetId: string, range?: string): Promise<unknown[][]> {
-  const queryRange = range || "A1:AA1000";
-  const token = await getTenantToken();
-  const { invoke } = await import("@tauri-apps/api/core");
-  const result: any = await invoke("feishu_sheet", {
-    token,
-    spreadsheet: sheetToken,
-    sheetId,
-    range: queryRange,
-  });
-  if (result?.code !== 0) throw new Error(`Feishu API error: ${result?.msg}`);
-  return result?.data?.valueRange?.values || [];
-}
-
+// 政策 sheet 行数据（用于 loadPolicies）
 export async function getPolicySheetRows(): Promise<unknown[][]> {
-  if (import.meta.env.VITE_USE_WORKERS) {
-    const { fetchPoliciesFromWorkers } = await import("../workers");
-    const result = await fetchPoliciesFromWorkers();
-    return [result.headers, ...result.data.map(row =>
-      result.headers.map(h => row[h] ?? null)
-    )];
-  }
-  return getSheetData(POLICY_SPREADSHEET, POLICY_SHEET_ID, "A1:U600");
+  type SheetData = { headers: string[]; data: Record<string, unknown>[] };
+  const sheet = await fetchJSON<SheetData>("/data/policies.json");
+  const { headers, data } = sheet;
+  // 转换为 rows 格式: [[headers], [row1], [row2], ...]
+  const rows: unknown[][] = [headers, ...data.map(row => headers.map(h => row[h] ?? null))];
+  return rows;
 }
 
-export { getSheetData };
-
-// 通用：将飞书表格转换为对象数组
+// 通用：读取静态属性 JSON（物业数据）
 export async function getSheetAsObjects<T = Record<string, unknown>>(
-  spreadsheet: string,
+  _spreadsheet: string, // 已废弃，保留参数兼容性
   sheetId: string,
-  startRow = 3
+  _startRow = 3         // 已废弃，静态数据已预处理
 ): Promise<T[]> {
-  if (import.meta.env.VITE_USE_WORKERS) {
-    const { fetchPropertySheet } = await import("../workers");
-    try {
-      return await fetchPropertySheet(sheetId) as T[];
-    } catch (e) {
-      console.warn(`[getSheetAsObjects] Workers failed for sheet ${sheetId}:`, e);
-      return [];
-    }
+  // sheetId 对应文件名: 4hdJSg → properties-parks, 4hdJSh → properties-buildings, 4hdJSi → properties-units
+  const fileMap: Record<string, string> = {
+    "4hdJSg": "/data/properties-parks.json",
+    "4hdJSh": "/data/properties-buildings.json",
+    "4hdJSi": "/data/properties-units.json",
+  };
+  const url = fileMap[sheetId];
+  if (!url) {
+    console.warn(`[getSheetAsObjects] Unknown sheetId: ${sheetId}`);
+    return [];
   }
-
-  const data = await getSheetData(spreadsheet, sheetId);
-  if (!data || data.length < 2) return [];
-
-  const headers = data[1] as string[];
-  if (!headers) return [];
-
-  const result: T[] = [];
-  for (let i = startRow - 1; i < data.length; i++) {
-    const row = data[i] as unknown[];
-    if (!row || row.length === 0 || !row[0]) continue;
-
-    const obj: Record<string, unknown> = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j] ?? null;
-    }
-    result.push(obj as T);
-  }
-
-  return result;
+  return fetchJSON<T[]>(url);
 }
+
+// 导出（已在上面声明）

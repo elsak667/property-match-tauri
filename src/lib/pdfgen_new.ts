@@ -4,8 +4,8 @@
  *  2. generatePdfBytes — jsPDF（保留备用）
  */
 import type { PolicyResult } from "../app/policy/types";
-import { openInBrowser } from "./tauri";
-import { invoke } from "@tauri-apps/api/core";
+
+
 
 function esc(s: string | undefined | null): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -150,16 +150,6 @@ window.addEventListener('load', () => { setTimeout(() => { window.print(); }, 60
 </body>
 </html>`;
 
-  // 检测是否在 Tauri 环境（网页版直接用 window.open，桌面版用 Tauri）
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  if (isTauri) {
-    const encoder = new TextEncoder();
-    const data: number[] = Array.from(encoder.encode(html));
-    const tmpFilename = `policy_print_${Date.now()}.html`;
-    const path = await invoke<string>("write_temp_file", { data, filename: tmpFilename });
-    await openInBrowser("file://" + path);
-  } else {
-    // 网页版：直接用 data URL 打开新窗口
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank", "width=900,height=700,scrollbars=yes");
@@ -168,24 +158,14 @@ window.addEventListener('load', () => { setTimeout(() => { window.print(); }, 60
       win.addEventListener("unload", () => URL.revokeObjectURL(url));
     }
   }
-}
 
 /** 用浏览器打印任意 HTML 内容 */
 export async function openPrintHtmlRaw(html: string): Promise<void> {
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  if (isTauri) {
-    const encoder = new TextEncoder();
-    const data: number[] = Array.from(encoder.encode(html));
-    const tmpFilename = `print_${Date.now()}.html`;
-    const path = await invoke<string>("write_temp_file", { data, filename: tmpFilename });
-    await openInBrowser("file://" + path);
-  } else {
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank", "width=900,height=700,scrollbars=yes");
-    if (win) {
-      win.addEventListener("unload", () => URL.revokeObjectURL(url));
-    }
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank", "width=900,height=700,scrollbars=yes");
+  if (win) {
+    win.addEventListener("unload", () => URL.revokeObjectURL(url));
   }
 }
 
