@@ -30,3 +30,4 @@ workers/.wrangler/
 *.njsproj
 *.sln
 *.sw?
+pnpm-lock.yaml
