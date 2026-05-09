@@ -61,6 +61,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git diff --quiet || git commit -m "chore: update static data JSON"
+          git fetch origin main:main
           git push origin main
         shell: bash
         env:
