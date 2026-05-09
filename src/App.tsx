@@ -89,7 +89,7 @@ export default function App() {
   return (
     <div className="app-wrapper">
       <div className="app-main">
-        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} onToggleFont={toggleFontSize} />
         <div className="container">
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
@@ -129,7 +129,7 @@ interface NavBarProps {
   onToggleFont?: () => void;
 }
 
-function NavBar({ currentPage, onNavigate }: NavBarProps) {
+function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
   return (
     <div className="navbar">
       <div className="navbar-brand">
@@ -151,7 +151,7 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
         ))}
       </nav>
       <div className="navbar-right">
-        <button className="font-toggle-btn" onClick={() => ((window as unknown as Record<string, unknown>).__toggleFont__ as (() => void) | undefined)?.()} title="切换字号">
+        <button className="font-toggle-btn" onClick={onToggleFont} title="切换字号">
           <span className="font-toggle-icon">A</span>
           <span className="font-toggle-icon large">A</span>
         </button>
