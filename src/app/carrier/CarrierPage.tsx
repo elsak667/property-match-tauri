@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { loadIndustries, matchProperties, loadPropertyData } from "../../lib/policy";
-import type { Property, PropertyMatchResult } from "../../lib/policy";
+import { loadIndustries } from "../../lib/policy";
+import { matchProperties, loadPropertyData } from "../../lib/property";
+import type { Property, PropertyMatchResult } from "../../lib/property";
 import PropertyMap from "../../components/PropertyMap";
 
 const YES_NO_OPTIONS = ["不限", "是", "否"];

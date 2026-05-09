@@ -9,10 +9,10 @@ import {
   type SheetData,
   type NewsItem,
 } from "./workers";
-import { loadPropertyData } from "./policy";
+import { loadPropertyData } from "./property";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
 import type { FilterOptions, PolicyResult } from "../app/policy/types";
-import type { Unit } from "./policy";
+import type { Unit } from "./property";
 
 function buildOptions(policies: PolicyResult[]): FilterOptions {
   const locations = new Set<string>();
