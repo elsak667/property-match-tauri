@@ -1,9 +1,9 @@
-name: "张通社新闻抓取"
+name: "Zhangtongshe News Scraper"
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */2 * * *"  # 每2小时跑一次
+    - cron: "0 */2 * * *"
 
 jobs:
   scrape:
@@ -29,6 +29,6 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           NEWS_SHEET_TOKEN: ${{ secrets.NEWS_SHEET_TOKEN }}
           NEWS_SHEET_ID: ${{ secrets.NEWS_SHEET_ID }}
