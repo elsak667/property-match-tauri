@@ -10,11 +10,51 @@ type Page = "home" | "property" | "policy" | "placeholder-invest" | "placeholder
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [fontLarge, setFontLarge] = useState(() => localStorage.getItem("font-scale") === "large");
   const { policies } = usePolicies();
   const { properties } = useProperties();
   const { news } = useNews();
   const policyCount = policies.length;
   const carrierCount = properties.length;
+
+  useEffect(() => {
+    if (fontLarge) {
+      document.body.classList.add("font-large");
+    } else {
+      document.body.classList.remove("font-large");
+    }
+  }, [fontLarge]);
+
+  useEffect(() => {
+    let styleEl = document.getElementById("font-size-override");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "font-size-override";
+      document.head.appendChild(styleEl);
+    }
+    if (fontLarge) {
+      styleEl.textContent = `
+      body.font-large .result-name { font-size: 20px !important; font-weight: 800 !important; }
+      body.font-large .result-park { font-size: 16px !important; }
+      body.font-large .stats-item-num { font-size: 26px !important; }
+      body.font-large .search-input { font-size: 16px !important; }
+      body.font-large .count { font-size: 16px !important; }
+      body.font-large .tag-btn { font-size: 15px !important; }
+      body.font-large .filter-label { font-size: 14px !important; }
+      body.font-large .meta-date { font-size: 14px !important; }
+      body.font-large .urgent-card-name { font-size: 16px !important; }
+      body.font-large .result-meta { font-size: 15px !important; }
+    `;
+    } else {
+      styleEl.textContent = "";
+    }
+  }, [fontLarge]);
+
+  const toggleFontSize = () => {
+    const next = !fontLarge;
+    setFontLarge(next);
+    localStorage.setItem("font-scale", next ? "large" : "normal");
+  };
 
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
@@ -28,7 +68,7 @@ export default function App() {
   return (
     <div className="app-wrapper">
       <div className="app-main">
-        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} onToggleFont={toggleFontSize} />
         <div className="container">
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
@@ -65,9 +105,10 @@ const NAV_ITEMS = [
 interface NavBarProps {
   currentPage: string;
   onNavigate: (page: Page) => void;
+  onToggleFont?: () => void;
 }
 
-function NavBar({ currentPage, onNavigate }: NavBarProps) {
+function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
   return (
     <div className="navbar">
       <div className="navbar-brand">
@@ -89,6 +130,10 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
         ))}
       </nav>
       <div className="navbar-right">
+        <button className="font-toggle-btn" onClick={onToggleFont} title="切换字号">
+          <span className="font-toggle-icon">A</span>
+          <span className="font-toggle-icon large">A</span>
+        </button>
         <span className="navbar-badge">🚫 内部使用</span>
       </div>
     </div>
