@@ -1,0 +1,36 @@
+name: Cleanup Stale Branches
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"  # 每周日凌晨3点 (北京时间11点)
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Delete merged branches
+        run: |
+          PROTECTED_BRANCHES="main"
+          for branch in $(git branch -r --merged origin/main --format='%(refname:short)' | grep -vE "^origin/($PROTECTED_BRANCHES)$"); do
+            branch_name="${branch#origin/}"
+            echo "Deleting merged branch: $branch_name"
+            git push origin --delete "$branch_name"
+          done
+
+      - name: Delete stale branches (no activity > 30 days)
+        run: |
+          PROTECTED_BRANCHES="main"
+          cutoff=$(date -d '30 days ago' +%s)
+          for branch in $(git branch -r --format='%(refname:short)' | grep -vE "^origin/($PROTECTED_BRANCHES)$"); do
+            last_commit=$(git log -1 --format=%ct "$branch" 2>/dev/null | tr -d ' ')
+            if [ -n "$last_commit" ] && [ "$last_commit" -lt "$cutoff" ]; then
+              branch_name="${branch#origin/}"
+              echo "Deleting stale branch (>30 days): $branch_name"
+              git push origin --delete "$branch_name"
+            fi
+          done

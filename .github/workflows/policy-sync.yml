@@ -15,15 +15,18 @@ on:
 
   schedule:
     - cron: "0 22 * * *"  # 每天 22:00 北京时间 = 14:00 UTC
+      branches: [main]
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
@@ -41,7 +44,7 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
 
       - name: Run full sync (manual with sgin)
         if: github.event.inputs.full_sync == 'true' && github.event.inputs.sgin != ''
@@ -49,4 +52,17 @@ jobs:
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          ***REMOVED***: ${{ secrets.***REMOVED*** }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+
+      - name: Export updated data to JSON
+        run: |
+          python3 scripts/export_feishu_to_json.py
+          git add public/data/
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet || git commit -m "chore: update static data JSON"
+          git push origin main
+        shell: bash
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
