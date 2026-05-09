@@ -74,7 +74,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             整合物业载体资源与政策信息，赋能一线招商团队
           </p>
           <div className="banner-meta">
-            <span>v2.1 · Tauri v2 · React 18</span>
+            <span>v2.1 · React 18</span>
           </div>
         </div>
         <div className="banner-right">
@@ -208,8 +208,7 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             <div className="about-icon">⚙️</div>
             <div className="about-title">技术架构</div>
             <div className="about-text">
-              基于 Tauri v2 桌面框架构建，前端 React 18 + TypeScript，后端 Rust，支持
-              Windows/macOS 双平台。
+              基于 React 18 + TypeScript 构建的 Web 应用，支持浏览器直接访问。
             </div>
           </div>
           <div className="about-card">
