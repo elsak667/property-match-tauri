@@ -15,7 +15,7 @@ on:
 
   schedule:
     - cron: "0 22 * * *"  # 每天 22:00 北京时间 = 14:00 UTC
-      branches: [dev]
+      branches: [main]
 
 jobs:
   sync:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: dev
+          ref: main
 
       - uses: actions/setup-node@v6
         with:
@@ -44,7 +44,7 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           git commit -m "chore: sync Feishu data at $COMMIT_DATE" || exit 0
           git push origin "$BRANCH_NAME"
-          gh pr create --base dev --head "$BRANCH_NAME" --title "$PR_TITLE" --body "自动同步飞书数据更新"
+          gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body "自动同步飞书数据更新"
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
