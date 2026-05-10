@@ -37,7 +37,7 @@ cd workers
 
 ```bash
 FEISHU_APP_ID=cli_a950307a10b8dcb1
-***REMOVED***=你的飞书应用密钥
+FEISHU_APP_SECRET=你的飞书应用密钥
 ```
 
 ### 3. 启动本地 Workers
@@ -75,7 +75,7 @@ cd workers
 npx wrangler secret put FEISHU_APP_ID
 # 输入你的飞书 App ID
 
-npx wrangler secret put ***REMOVED***
+npx wrangler secret put FEISHU_APP_SECRET
 # 输入你的飞书 App Secret
 ```
 
@@ -117,6 +117,23 @@ pnpm run build
 | `/api/news` | GET | 获取新闻列表（26条） |
 | `/api/properties?type=单元` | GET | 获取物业数据（园区/楼宇/单元/产业字典） |
 | `/api/property-stats` | GET | 获取统计数据 |
+| `/api/ai/search?q=...` | GET | AI 语义搜索（RAG，向量匹配） |
+
+## 部署
+
+### Cloudflare Pages（前端）
+- **域名**: `https://pudong.198857.sbs`
+- **源**: `property-match-tauri.pages.dev`
+
+### Cloudflare Workers（API）
+- **域名**: `https://api.198857.sbs`
+- **旧域名**: `https://api.elsak.eu.org`（已废弃，仅保留过渡）
+
+### 前端 → API 路由
+```
+pudong.198857.sbs  → 前端静态（Cloudflare Pages）
+api.198857.sbs     → Workers API（飞书代理 + AI）
+```
 
 ## 四、权限说明
 

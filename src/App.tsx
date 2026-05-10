@@ -3,14 +3,33 @@ import PolicyPage from "./app/policy/PolicyPage";
 import CarrierPage from "./app/carrier/CarrierPage";
 import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
+import Feedback from "./components/Feedback";
+import AIAssistant from "./components/AIAssistant";
+import { Icon } from "./components/Icons";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
 
-type Page = "home" | "property" | "policy" | "placeholder-invest" | "placeholder-industry";
+type Page = "home" | "policy" | "property" | "placeholder-invest" | "placeholder-industry";
+
+interface AiPropertyMatch {
+  id: number;
+  name: string;
+  building: string;
+  building_id: string;
+  park: string;
+  match_reason: string;
+  score: number;
+}
+interface AiSearchResult {
+  policies: unknown[];
+  properties: AiPropertyMatch[];
+  summary: string;
+}
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
-  const [fontLarge, setFontLarge] = useState(() => localStorage.getItem("font-scale") === "large");
+  const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
+  const [aiActiveBuildingId, setAiActiveBuildingId] = useState<string | null>(null);
   const { policies } = usePolicies();
   const { properties } = useProperties();
   const { news } = useNews();
@@ -18,68 +37,8 @@ export default function App() {
   const carrierCount = properties.length;
 
   useEffect(() => {
-    if (fontLarge) {
-      document.body.classList.add("font-large");
-      // 强制覆盖内联 fontSize（内联样式优先级高于 class，需用 JS 逐元素覆盖）
-      document.querySelectorAll("[style*='font-size']").forEach(el => {
-        const htmlEl = el as HTMLElement;
-        const current = htmlEl.style.fontSize;
-        if (!current) return;
-        const base = parseInt(current);
-        if (isNaN(base)) return;
-        const scaled = Math.min(base * 1.25, base + 4);
-        htmlEl.dataset["origFontSize"] = current;
-        htmlEl.style.fontSize = `${scaled}px`;
-      });
-    } else {
-      document.body.classList.remove("font-large");
-      // 恢复原始内联 fontSize
-      document.querySelectorAll("[data-orig-font-size]").forEach(el => {
-        const htmlEl = el as HTMLElement;
-        htmlEl.style.fontSize = htmlEl.dataset["origFontSize"] || "";
-        delete htmlEl.dataset["origFontSize"];
-      });
-    }
-  }, [fontLarge]);
-
-  useEffect(() => {
-    let styleEl = document.getElementById("font-size-override");
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "font-size-override";
-      document.head.appendChild(styleEl);
-    }
-    if (fontLarge) {
-      styleEl.textContent = `
-      body.font-large .result-name { font-size: 20px !important; font-weight: 800 !important; }
-      body.font-large .result-park { font-size: 16px !important; }
-      body.font-large .stats-item-num { font-size: 26px !important; }
-      body.font-large .search-input { font-size: 16px !important; }
-      body.font-large .count { font-size: 16px !important; }
-      body.font-large .tag-btn { font-size: 15px !important; }
-      body.font-large .filter-label { font-size: 14px !important; }
-      body.font-large .meta-date { font-size: 14px !important; }
-      body.font-large .urgent-card-name { font-size: 16px !important; }
-      body.font-large .result-meta { font-size: 15px !important; }
-    `;
-    } else {
-      styleEl.textContent = "";
-    }
-  }, [fontLarge]);
-
-  const toggleFontSize = () => {
-    const next = !fontLarge;
-    setFontLarge(next);
-    localStorage.setItem("font-scale", next ? "large" : "normal");
-  };
-
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__toggleFont__ = toggleFontSize;
-  }, [fontLarge]);
-
-  useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
-      if (["home", "property", "policy", "placeholder-invest", "placeholder-industry"].includes(page)) {
+      if (["home", "policy", "property", "placeholder-invest", "placeholder-industry"].includes(page)) {
         setCurrentPage(page as Page);
       }
     };
@@ -88,12 +47,21 @@ export default function App() {
 
   return (
     <div className="app-wrapper">
-      <div className="app-main">
-        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} onToggleFont={toggleFontSize} />
-        <div className="container">
+      <div className="app-main anim-navbar">
+        <NavBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+        <div>
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
-          {currentPage === "property" && <CarrierPage />}
+          {currentPage === "property" && (
+            <CarrierPage
+              aiResult={aiResult}
+              onAiBuildingClick={(buildingId: string) => {
+                setAiActiveBuildingId(buildingId);
+                setCurrentPage("property");
+              }}
+              aiActiveBuildingId={aiActiveBuildingId}
+            />
+          )}
           {currentPage === "placeholder-invest" && (
             <PlaceholderPage
               title="招商管理"
@@ -111,31 +79,39 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
+      <AIAssistant
+        aiActiveBuildingId={aiActiveBuildingId}
+        onAiResultChange={setAiResult}
+        onAiBuildingClick={(buildingId: string) => {
+          if (buildingId === "") {
+            setAiActiveBuildingId(null);
+          } else {
+            setAiActiveBuildingId(buildingId);
+            if (currentPage !== "property") setCurrentPage("property");
+          }
+        }}
+      />
+      <Feedback />
     </div>
   );
 }
 
 const NAV_ITEMS = [
-  { key: "home" as const, label: "首页", icon: "🏠" },
-  { key: "policy" as const, label: "政策匹配", icon: "📋" },
-  { key: "property" as const, label: "物业载体", icon: "🏢" },
-  { key: "placeholder-invest" as const, label: "招商管理", icon: "📊" },
-  { key: "placeholder-industry" as const, label: "产业图谱", icon: "🗺️" },
+  { key: "home" as const, label: "首页", IconComp: Icon.home },
+  { key: "policy" as const, label: "政策匹配", IconComp: Icon.policy },
+  { key: "property" as const, label: "物业载体", IconComp: Icon.property },
+  { key: "placeholder-invest" as const, label: "招商管理", IconComp: Icon.chart },
+  { key: "placeholder-industry" as const, label: "产业图谱", IconComp: Icon.industry },
 ] as const;
 
 interface NavBarProps {
   currentPage: string;
   onNavigate: (page: Page) => void;
-  onToggleFont?: () => void;
 }
 
-function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
+function NavBar({ currentPage, onNavigate }: NavBarProps) {
   return (
     <div className="navbar">
-      <div className="navbar-brand">
-        <span className="navbar-logo">🚀</span>
-        <span className="navbar-title">浦发集团招商平台</span>
-      </div>
       <nav className="navbar-tabs" role="tablist" aria-label="主导航">
         {NAV_ITEMS.map(item => (
           <button
@@ -145,17 +121,13 @@ function NavBar({ currentPage, onNavigate, onToggleFont }: NavBarProps) {
             className={"navbar-tab" + (currentPage === item.key ? " active" : "")}
             onClick={() => onNavigate(item.key)}
           >
-            <span className="tab-icon">{item.icon}</span>
+            <span className="tab-icon">{item.IconComp()}</span>
             <span className="tab-label">{item.label}</span>
           </button>
         ))}
       </nav>
       <div className="navbar-right">
-        <button className="font-toggle-btn" onClick={onToggleFont} title="切换字号">
-          <span className="font-toggle-icon">A</span>
-          <span className="font-toggle-icon large">A</span>
-        </button>
-        <span className="navbar-badge">🚫 内部使用</span>
+        <span className="navbar-badge"><Icon.zapAccent /> 内部使用</span>
       </div>
     </div>
   );
@@ -171,7 +143,7 @@ function MobileTabBar({ currentPage, onNavigate }: NavBarProps) {
           onClick={() => onNavigate(item.key)}
           aria-label={item.label}
         >
-          <span className="mobile-tab-icon">{item.icon}</span>
+          <span className="mobile-tab-icon">{item.IconComp()}</span>
           <span className="mobile-tab-label">{item.label}</span>
         </button>
       ))}
