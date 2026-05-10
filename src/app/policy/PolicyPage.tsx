@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { openPrintHtml } from "../../lib/pdfgen_new";
 import { filterPolicies } from "./mockData";
 import { usePolicies } from "../../lib/useFeishu";
-import { getPolicyStats } from "../../lib/tauri";
+import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
+import { trackExport, trackClick, trackSearch, trackDetail, trackCopy } from "../../lib/track";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.198857.sbs";
 
 function stripHtml(text: string): string {
   if (!text) return "";
@@ -37,6 +40,18 @@ function PolicyCard({
   const daysLeft = item.days_left;
   const isUrgent = daysLeft > 0 && daysLeft <= 30;
 
+  async function handleCopy() {
+    const summary = `${item.name || ""}
+最高补贴：${item.amount_s || "—"}
+申报截止：${item.end_date ? item.end_date.substring(0, 10) : "长期有效"}
+发布单位：${item.dept || "—"}
+适用区域：${item.area || "浦东新区"}`;
+    try {
+      await navigator.clipboard.writeText(summary);
+      trackCopy(name);
+    } catch { /* ignore */ }
+  }
+
   return (
     <div
       className={`result-item${isExpanded ? " expanded" : ""}${isSelected ? " selected" : ""}`}
@@ -47,15 +62,15 @@ function PolicyCard({
           <input
             type="checkbox"
             checked={isSelected}
-            onChange={() => onToggleSelect(name)}
+            onChange={() => { onToggleSelect(name); trackClick(name); }}
             style={{ marginTop: "3px", cursor: "pointer" }}
             aria-label={name}
           />
           <div className="result-name">{item.stars} {name}</div>
         </div>
         <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-          {isUrgent && <span className="hot-badge">🔥 即将截止</span>}
-          {item.expired && <span className="expired-badge">已过期</span>}
+          {isUrgent && <span className="hot-badge"><Icon.zapAccent /> 即将截止</span>}
+          {item.expired && <span className="expired-badge"><Icon.xCircle /> 已过期</span>}
           <button className="expand-hint" onClick={() => onToggleExpand(name)} aria-expanded={isExpanded}>
             {isExpanded ? "收起 ▲" : "展开 ▼"}
           </button>
@@ -63,13 +78,13 @@ function PolicyCard({
       </div>
       <div className="result-meta compact">
         <span className="meta-main">
-          {item.amount_s ? item.amount_s === "待定" ? "💰 待定" : /万|元/.test(item.amount_s) ? `💰 ${item.amount_s}` : `💰 ${item.amount_s}万元` : "—"}
+          {item.amount_s ? item.amount_s === "待定" ? <><Icon.lightbulb /> 待定</> : /万|元/.test(item.amount_s) ? <><Icon.lightbulb /> {item.amount_s}</> : <><Icon.lightbulb /> {item.amount_s}万元</> : "—"}
         </span>
-        {item.industry && <span>🏭 {item.industry}</span>}
-        {item.subject && <span>👥 {item.subject}</span>}
-        {item.cap && <span>💡 {item.cap}</span>}
+        {item.industry && <span><Icon.industry /> {item.industry}</span>}
+        {item.subject && <span><Icon.users /> {item.subject}</span>}
+        {item.cap && <span><Icon.lightbulb /> {item.cap}</span>}
         <span className={`meta-date${isUrgent ? " urgent" : ""}`}>
-          {item.end_date ? `📅 ${item.end_date.substring(0, 10)}` : "📅 长期有效"}
+          {item.end_date ? <><Icon.calendarDays /> {item.end_date.substring(0, 10)}</> : <><Icon.calendarDays /> 长期有效</>}
           {daysLeft > 0 && daysLeft < 365 && !item.expired && ` (${daysLeft}天)`}
         </span>
       </div>
@@ -78,6 +93,15 @@ function PolicyCard({
       )}
       {isExpanded && (
         <div className="result-details">
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 12, padding: "2px 10px" }}
+              onClick={handleCopy}
+            >
+              📋 复制摘要
+            </button>
+          </div>
           <div className="detail-section">
             <div className="detail-title">基本信息</div>
             <div className="detail-grid">
@@ -143,24 +167,27 @@ export default function PolicyPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [companyName, setCompanyName] = useState("");
-  const [showExport, setShowExport] = useState(false);
   const [matchLoading, setMatchLoading] = useState(false);
   const [toast, setToast] = useState<Toast>({ type: "idle", message: "" });
   const [showAll, setShowAll] = useState(false);
+  const [hideExpired, setHideExpired] = useState(false);
   const [stats, setStats] = useState<{local数据库:number; 官方总数:number; 匹配率:string; 差异:number; 数据来源:string; 官方链接:string} | null>(null);
 
   // 加载浦易达官网统计
   useEffect(() => {
     async function fetchStats() {
       try {
-        const s = await getPolicyStats();
+        const res = await fetch(`${API_BASE}/api/property-stats`);
+        const s = await res.json();
+        const localCount = policies.length;
+        const officialCount = s.official_count > 0 ? s.official_count : 0;
         setStats({
-          local数据库: policies.length,
-          官方总数: s.official_count,
-          匹配率: s.official_count > 0 ? `${Math.round(policies.length / s.official_count * 100)}%` : "—",
-          差异: s.official_count > 0 ? policies.length - s.official_count : 0,
-          数据来源: s.source,
-          官方链接: s.official_link,
+          local数据库: localCount,
+          官方总数: officialCount,
+          匹配率: officialCount > 0 ? `${Math.round(localCount / officialCount * 100)}%` : "—",
+          差异: officialCount > 0 ? localCount - officialCount : 0,
+          数据来源: s.source || "浦易达官网",
+          官方链接: s.official_link || "https://pyd.pudong.gov.cn/website/pud/policyretrieval",
         });
       } catch { /* ignore */ }
     }
@@ -177,31 +204,44 @@ export default function PolicyPage() {
     setResults(sorted);
   }, [policies]);
 
+  // 过滤结果（隐藏过期）
+  const filteredResults = useMemo(() => {
+    if (!hideExpired) return results;
+    return results.filter(r => !r.expired);
+  }, [results, hideExpired]);
+
   const showToast = useCallback((type: ToastType, message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast({ type: "idle", message: "" }), 3500);
   }, []);
 
   const doMatch = useCallback(() => {
+    trackSearch(query);
     setMatchLoading(true);
-    setTimeout(() => {
-      const filtered = filterPolicies(policies, {
-        query,
-        industry: industries[0] || "",
-        location,
-        dept,
-        caps,
-      });
-      // 按发布时间倒序
-      const sorted = [...filtered].sort((a, b) => {
-        const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
-        const tb = b.zcReleaseTime ? new Date(b.zcReleaseTime).getTime() : 0;
-        return tb - ta;
-      });
-      setResults(sorted);
-      setMatchLoading(false);
-    }, 300);
+    const filtered = filterPolicies(policies, {
+      query,
+      industry: industries[0] || "",
+      location,
+      dept,
+      caps,
+    });
+    const sorted = [...filtered].sort((a, b) => {
+      const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
+      const tb = b.zcReleaseTime ? new Date(b.zcReleaseTime).getTime() : 0;
+      return tb - ta;
+    });
+    setResults(sorted);
+    setMatchLoading(false);
   }, [policies, query, industries, location, dept, caps]);
+
+  const handleToggleExpand = useCallback((name: string) => {
+    trackDetail(name);
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(doMatch, 300);
@@ -212,13 +252,7 @@ export default function PolicyPage() {
     setArr(arr.includes(k) ? arr.filter(x => x !== k) : [...arr, k]);
   }
 
-  function toggleExpand(id: string) {
-    const next = new Set(expanded);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setExpanded(next);
-  }
-
-  function toggleSelect(id: string) {
+  const toggleSelect = (id: string) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelected(next);
@@ -244,6 +278,7 @@ export default function PolicyPage() {
     if (selected.size === 0) { showToast("error", "请先选择要导出的政策"); return; }
     const selectedItems = results.filter(r => selected.has(r.name || ""));
     if (selectedItems.length === 0) { showToast("error", "请先选择要导出的政策"); return; }
+    trackExport(selectedItems.map(i => i.name || ""));
     await openPrintHtml(selectedItems, companyName || "某企业");
     showToast("info", "浏览器已打开，请在浏览器中打印保存为 PDF");
   }
@@ -256,33 +291,48 @@ export default function PolicyPage() {
     <div className="container">
       {toast.type !== "idle" && (
         <div className={`toast toast-${toast.type}`} role="alert">
-          {toast.type === "success" && "✅ "}
-          {toast.type === "error" && "❌ "}
-          {toast.type === "info" && "ℹ️ "}
+          {toast.type === "success" && <Icon.checkCircle />}
+          {toast.type === "error" && <Icon.xCircle />}
+          {toast.type === "info" && <Icon.info />}
           {toast.message}
         </div>
       )}
 
-      {stats && (
-        <div className="stats-bar">
-          <span className="stats-bar-label">📊 数据对比</span>
-          <div className="stats-items">
-            <div className="stats-item"><span className="stats-item-num">{stats.local数据库}</span><span className="stats-item-label">本地政策</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num">{stats.官方总数 > 0 ? stats.官方总数 : "—"}</span><span className="stats-item-label">官网总数</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num" style={{ color: "#059669" }}>{stats.匹配率}</span><span className="stats-item-label">覆盖率</span></div>
-            <div className="stats-divider" />
-            <div className="stats-item"><span className="stats-item-num" style={{ color: stats.差异 >= 0 ? "#1a3a6e" : "#dc2626" }}>{stats.差异 >= 0 ? "+" : ""}{stats.差异}</span><span className="stats-item-label">差异</span></div>
-          </div>
-          <div className="stats-source">{stats.数据来源} <a href={stats.官方链接} target="_blank" rel="noopener noreferrer">浦易达官网 →</a></div>
+      {/* Hero Banner */}
+      <div className="policy-hero-banner">
+        <div className="policy-hero-brand">
+          <span className="policy-hero-title">政策匹配</span>
+          <span className="policy-hero-sub">Policy Intelligence</span>
         </div>
-      )}
+        <div className="policy-hero-stats">
+          <span className="policy-hero-stat">
+            <strong>{policies.length}</strong>
+            <span>本地政策</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong>{stats && stats.官方总数 > 0 ? stats.官方总数 : "—"}</strong>
+            <span>官网总数</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong style={{ color: "#4ade80" }}>{stats?.匹配率 || "—"}</strong>
+            <span>覆盖率</span>
+          </span>
+          <span className="policy-hero-stat-sep">·</span>
+          <span className="policy-hero-stat">
+            <strong style={{ color: stats && (stats.差异 as number) >= 0 ? "#4ade80" : "#f87171" }}>
+              {stats ? ((stats.差异 as number) >= 0 ? "+" : "") + stats.差异 : "—"}
+            </strong>
+            <span>差异</span>
+          </span>
+        </div>
+      </div>
 
       <div className="main-layout">
         <aside className="sidebar">
           <div className="filter-section">
-            <div className="filter-label">🔍 关键词搜索</div>
+            <div className="filter-label"><Icon.searchMuted /> 关键词搜索</div>
             <input
               id="query-input"
               type="text"
@@ -300,7 +350,7 @@ export default function PolicyPage() {
 
           {options.locations.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">📍 适用区域</div>
+              <div className="filter-label"><Icon.mapPinAccent /> 适用区域</div>
               <div className="tag-grid">
                 {options.locations.map(loc => (
                   <button
@@ -317,7 +367,7 @@ export default function PolicyPage() {
 
           {options.industries.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">🏭 产业方向</div>
+              <div className="filter-label"><Icon.industry /> 产业方向</div>
               <div className="tag-grid">
                 {options.industries.map(ind => (
                   <button
@@ -334,7 +384,7 @@ export default function PolicyPage() {
 
           {options.depts.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">🏛️ 发布单位</div>
+              <div className="filter-label"><Icon.buildingMuted /> 发布单位</div>
               <select
                 className="filter-select"
                 value={dept}
@@ -349,7 +399,7 @@ export default function PolicyPage() {
 
           {options.caps.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label">💡 政策能力</div>
+              <div className="filter-label"><Icon.zap /> 政策能力</div>
               <div className="tag-grid">
                 {options.caps.map(c => (
                   <button
@@ -367,7 +417,6 @@ export default function PolicyPage() {
           
           <div className="form-actions">
             <button className="btn-secondary" onClick={resetAll}>重置全部</button>
-            <button className="btn-primary" onClick={doMatch}>开始匹配</button>
           </div>
           {activeFiltersCount > 0 && (
             <div className="filter-count">已选 {activeFiltersCount} 个筛选条件</div>
@@ -379,28 +428,34 @@ export default function PolicyPage() {
             <div className="count">
               {isLoading
                 ? <>加载中...</>
-                : <>共找到 <strong>{results.length}</strong> 条政策，已选 <strong>{selected.size}</strong> 条</>
+                : <>共找到 <strong>{filteredResults.length}</strong> 条政策，已选 <strong>{selected.size}</strong> 条</>
               }
             </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              共 {policies.length} 条 · {fromFeishu ? "📡 飞书数据" : "📋 Mock数据"}
+              {hideExpired && filteredResults.length !== results.length && (
+                <span style={{ marginRight: 8 }}>（共 {results.length} 条，已隐藏 {results.length - filteredResults.length} 条过期）</span>
+              )}
+              {fromFeishu ? "飞书数据" : "Mock数据"}
+              <label style={{ marginLeft: 12, cursor: "pointer", color: "var(--primary)", textDecoration: "underline" }}>
+                <input type="checkbox" checked={hideExpired} onChange={e => setHideExpired(e.target.checked)} style={{ marginRight: 4 }} />
+                隐藏过期
+              </label>
             </div>
             <div className="legend">
-              {results.length > 5 && (
+              {filteredResults.length > 5 && (
                 <button
-                  style={{ fontSize: 12, padding: "2px 10px", cursor: "pointer", background: showAll ? "#e2e8f0" : "#3b6db5", color: showAll ? "#333" : "#fff", border: "none", borderRadius: 4 }}
+                  style={{ fontSize: 12, padding: "2px 10px", cursor: "pointer", background: showAll ? "#e2e8f0" : "var(--primary)", color: showAll ? "#333" : "#fff", border: "none", borderRadius: 4 }}
                   onClick={() => setShowAll(v => !v)}
                 >
-                  {showAll ? "收起 ▲" : `展开全部 ${results.length} 条 ▼`}
+                  {showAll ? "收起 ▲" : `展开全部 ${filteredResults.length} 条 ▼`}
                 </button>
               )}
             </div>
           </div>
 
-          {showExport && (
-            <div className="export-panel">
-              <div className="export-title">导出政策清单</div>
-              <div className="export-row">
+          {results.length > 0 && selected.size > 0 && (
+            <div className="content-footer">
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <input
                   id="company-input"
                   type="text"
@@ -409,17 +464,42 @@ export default function PolicyPage() {
                   value={companyName}
                   onChange={e => setCompanyName(e.target.value)}
                   maxLength={50}
-                  style={{ maxWidth: "200px" }}
+                  style={{ maxWidth: "180px", padding: "6px 10px", border: "1.5px solid var(--border-hi)", borderRadius: 8, fontSize: 12 }}
                 />
-                <button className="btn-primary" onClick={exportPdf} disabled={selected.size === 0}>
-                  打印导出 ({selected.size} 条)
+                <button className="btn-primary" onClick={exportPdf}>
+                  📥 导出 {selected.size} 条政策
                 </button>
                 <button className="btn-secondary" onClick={selectAll}>全选</button>
                 <button className="btn-secondary" onClick={clearSelection}>清空</button>
-                <button className="btn-secondary" onClick={() => setShowExport(false)}>收起</button>
               </div>
+              <button className="btn-secondary" onClick={doMatch}><Icon.refreshAccent /> 刷新结果</button>
             </div>
           )}
+
+          {/* 即将到期政策高亮区 */}
+          {(() => {
+            const urgent = policies.filter(p => p.days_left > 0 && p.days_left <= 30 && !p.expired);
+            if (urgent.length === 0) return null;
+            return (
+              <div className="urgent-section">
+                <div className="urgent-header">
+                  <Icon.zapAccent /> <span>本月即将截止</span>
+                  <span className="urgent-count">{urgent.length} 条</span>
+                </div>
+                <div className="urgent-cards">
+                  {urgent.slice(0, 3).map(p => (
+                    <div key={p.name} className="urgent-card" onClick={() => handleToggleExpand(p.name || "")}>
+                      <div className="urgent-card-name">{p.name}</div>
+                      <div className="urgent-card-meta">
+                        <span>{p.amount_s || "—"}</span>
+                        <span className="urgent-days">{p.days_left} 天后截止</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="result-list">
             {isLoading ? (
@@ -429,43 +509,50 @@ export default function PolicyPage() {
               </div>
             ) : results.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon"><Icon.file /></div>
                 <p>未找到匹配政策</p>
-                <small>试试调整筛选条件</small>
-                {hasFilters && (
-                  <button className="btn-secondary" onClick={resetAll} style={{ marginTop: "12px" }}>
-                    重置筛选
-                  </button>
+                {hasFilters ? (
+                  <>
+                    <small>试试调整筛选条件，或缩短关键词</small>
+                    <button className="btn-secondary" onClick={resetAll} style={{ marginTop: "12px" }}>
+                      重置筛选
+                    </button>
+                  </>
+                ) : query.trim() ? (
+                  <small>试试缩短关键词，如只保留核心行业词</small>
+                ) : (
+                  <small>选择筛选条件后再试</small>
                 )}
               </div>
             ) : (
-              (showAll ? results : results.slice(0, 5)).map(item => (
+              (showAll ? filteredResults : filteredResults.slice(0, 5)).map(item => (
                 <PolicyCard
                   key={item.name ?? ""}
                   item={item}
                   expanded={expanded}
                   selected={selected}
-                  onToggleExpand={toggleExpand}
+                  onToggleExpand={handleToggleExpand}
                   onToggleSelect={toggleSelect}
                 />
               ))
             )}
           </div>
 
-          {results.length > 0 && (
+          {results.length > 0 && selected.size === 0 && (
             <div className="content-footer">
-              {!showExport && (
-                <button className="btn-primary" onClick={() => setShowExport(true)}>📥 导出/打印政策</button>
-              )}
-              <button className="btn-secondary" onClick={doMatch}>🔄 重新匹配</button>
+              <button className="btn-primary" onClick={doMatch}><Icon.refreshAccent /> 刷新结果</button>
             </div>
           )}
         </main>
       </div>
 
-      <div className="footer-banner">
-        <div className="footer-warning">⚠️ 本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</div>
-        <div className="footer-credit">浦发集团招商中心 · 仅供内部使用 · 技术支持：Els.J</div>
+      <div className="footer-row">
+        <span className="footer-disclaimer">本系统为内部测试工具，政策数据来源于政府公开信息，匹配结果仅供参考。</span>
+      </div>
+      <div className="footer-row">
+        <span>浦发集团招商中心</span>
+        <span className="footer-sep">·</span>
+        <span>技术支持：Els.J</span>
       </div>
     </div>
   );
