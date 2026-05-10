@@ -245,10 +245,13 @@ def step1_fetch(pudong_token):
     log(f"  待抓: {len(to_fetch)} 条")
 
     if not to_fetch:
-        if api_list_success:
-            log("  全部完成，无需抓取")
+        if existing:
             _save_excel_17(existing, EXCEL_RAW)
-        return bool(api_list_success)
+            log(f"  已有 {len(existing)} 条记录，无新数据")
+        elif api_list_success:
+            _save_excel_17(existing, EXCEL_RAW)
+            log("  全部完成，无需抓取")
+        return bool(api_list_success) or len(existing) > 0
 
     ok = fail = 0
     for i, pid in enumerate(to_fetch):
