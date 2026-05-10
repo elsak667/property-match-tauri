@@ -67,7 +67,7 @@ const NEWS_COLORS: Record<string, string> = {
 };
 
 export default function HomePage({ policyCount, carrierCount, news }: Props) {
-  const recent = news.slice(0, 20);
+  const recent = [...news].reverse().slice(0, 20);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
