@@ -4,7 +4,8 @@
  * - 专业招商人员：可展开多维筛选面板 + 批量对比
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchBuildings, filterProperties, type BuildingSummary } from "../../lib/workers";
+import { loadPropertyData } from "../../lib/property";
+import { filterProperties, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
 import { Icon } from "../../components/Icons";
 import PropertyMap from "../../components/PropertyMap";
@@ -206,8 +207,31 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
 
   // 加载全量楼栋（用于楼栋列表和地图坐标）
   useEffect(() => {
-    fetchBuildings()
-      .then(data => { setAllBuildings(data ?? []); setLoading(false); })
+    loadPropertyData()
+      .then(({ buildings, units }) => {
+        // Build area_total per building from units
+        const areaMap: Record<string, number> = {};
+        for (const u of units) {
+          if (!u.building_id) continue;
+          areaMap[u.building_id] = (areaMap[u.building_id] ?? 0) + (u.area_total ?? 0);
+        }
+        const summaries: BuildingSummary[] = buildings.map(b => ({
+          building_id: b.building_id ?? "",
+          name: b.name ?? "",
+          industry: b.industry ?? "",
+          lat: b.lat ?? null,
+          lng: b.lng ?? null,
+          park_id: b.park_id ?? "",
+          park_name: "",
+          district: (b.district ?? "") || "",
+          floors: b.floors ?? 0,
+          area_total: areaMap[b.building_id ?? ""] ?? 0,
+          area_vacant: b.area_vacant ?? 0,
+          price: b.price ?? null,
+        }));
+        setAllBuildings(summaries);
+        setLoading(false);
+      })
       .catch((e: Error) => { setError(e.message); setLoading(false); });
   }, []);
 

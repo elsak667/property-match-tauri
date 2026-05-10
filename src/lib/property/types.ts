@@ -51,8 +51,10 @@ export interface Building {
   rel_y: number | null;
   elevator_p: number | null;
   elevator_c: number | null;
-  "纬度(lat)": number | null;
-  "经度(lng)": number | null;
+  lat: number | null;
+  lng: number | null;
+  district: string | null;
+  price: number | null;
 }
 
 export interface Unit {

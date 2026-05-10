@@ -84,8 +84,14 @@ function normalizeRecord<T>(record: Record<string, unknown>, fieldMap: Record<st
   return result as T;
 }
 
+function isHeaderRow(record: Record<string, unknown>): boolean {
+  return record["楼宇ID"] === "楼宇ID" || record["园区ID"] === "园区ID" || record["单元ID"] === "单元ID";
+}
+
 function normalizeArray<T>(arr: Record<string, unknown>[], fieldMap: Record<string, string>): T[] {
-  return arr.map(item => normalizeRecord<T>(item, fieldMap));
+  return arr
+    .filter(item => !isHeaderRow(item))
+    .map(item => normalizeRecord<T>(item, fieldMap));
 }
 
 // ── 静态 JSON 加载 ─────────────────────────────────────────────────────────
