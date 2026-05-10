@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from "react";
 import { loadPropertyData } from "./property";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
 import type { FilterOptions, PolicyResult } from "../app/policy/types";
-import type { Unit } from "./property";
 import type { NewsItem } from "./tauri";
 
 // ── 静态 JSON 加载 ─────────────────────────────────────────────────────────
@@ -143,18 +142,18 @@ export function usePolicies() {
 }
 
 export function useProperties() {
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [buildings, setBuildings] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     loadPropertyData()
-      .then(({ units: u }) => { setUnits(u); })
-      .catch(() => { setUnits([]); })
+      .then(({ buildings: b }) => { setBuildings(b); })
+      .catch(() => { setBuildings([]); })
       .finally(() => { setLoading(false); });
   }, []);
 
-  return { properties: units, loading };
+  return { properties: buildings, loading };
 }
 
 export function useNews() {
