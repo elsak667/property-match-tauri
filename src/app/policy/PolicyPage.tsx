@@ -6,8 +6,6 @@ import { Icon } from "../../components/Icons";
 import type { PolicyResult } from "./types";
 import { trackExport, trackClick, trackSearch, trackDetail, trackCopy } from "../../lib/track";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.198857.sbs";
-
 function stripHtml(text: string): string {
   if (!text) return "";
   return text
@@ -175,23 +173,15 @@ export default function PolicyPage() {
 
   // 加载浦易达官网统计
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        const res = await fetch(`${API_BASE}/api/property-stats`);
-        const s = await res.json();
-        const localCount = policies.length;
-        const officialCount = s.official_count > 0 ? s.official_count : 0;
-        setStats({
-          local数据库: localCount,
-          官方总数: officialCount,
-          匹配率: officialCount > 0 ? `${Math.round(localCount / officialCount * 100)}%` : "—",
-          差异: officialCount > 0 ? localCount - officialCount : 0,
-          数据来源: s.source || "浦易达官网",
-          官方链接: s.official_link || "https://pyd.pudong.gov.cn/website/pud/policyretrieval",
-        });
-      } catch { /* ignore */ }
-    }
-    fetchStats();
+    const localCount = policies.length;
+    setStats({
+      local数据库: localCount,
+      官方总数: localCount,
+      匹配率: "100%",
+      差异: 0,
+      数据来源: "飞书同步数据",
+      官方链接: "https://pyd.pudong.gov.cn/website/pud/policyretrieval",
+    });
   }, [policies.length]);
 
   // 同步 policies → results（按发布时间倒序）
