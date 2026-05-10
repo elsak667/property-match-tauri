@@ -4,7 +4,7 @@
 
 interface Env {
   FEISHU_APP_ID: string;
-  ***REMOVED***: string;
+  FEISHU_APP_SECRET: string;
   PROPERTY_SHEET: string;
   PROPERTY_BUILDING_SHEET_ID: string;
   POLICY_SHEET: string;
@@ -31,7 +31,7 @@ async function getToken(env: Env): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_id: env.FEISHU_APP_ID, app_secret: env.***REMOVED*** }),
+    body: JSON.stringify({ app_id: env.FEISHU_APP_ID, app_secret: env.FEISHU_APP_SECRET }),
   });
   const data = await res.json() as { code: number; msg?: string; tenant_access_token?: string };
   if (data.code !== 0 || !data.tenant_access_token) {
@@ -112,7 +112,7 @@ async function handleAiQuery(query: string, env: Env): Promise<Response> {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${env.***REMOVED***}`,
+        "Authorization": `Bearer ${env.FEISHU_APP_SECRET}`,
         "Content-Type": "application/json",
       },
       body,
@@ -171,7 +171,7 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     if (path === "/api/config" && request.method === "GET") {
       return json({
         has_app_id: !!env.FEISHU_APP_ID,
-        has_credentials: !!(env.FEISHU_APP_ID && env.***REMOVED***),
+        has_credentials: !!(env.FEISHU_APP_ID && env.FEISHU_APP_SECRET),
         property_sheet: env.PROPERTY_SHEET,
         policy_sheet: env.POLICY_SHEET,
       });

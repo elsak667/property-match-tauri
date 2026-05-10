@@ -2,6 +2,7 @@ name = "pudong-invest-platform"
 main = "src/index.ts"
 compatibility_date = "2025-01-09"
 workers_dev = true
+pages_build_output_dir = "../dist"
 
 [vars]
 PROPERTY_SHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg"

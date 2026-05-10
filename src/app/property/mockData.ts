@@ -24,11 +24,11 @@ export function filterProperties(
   return items.filter(p => {
     if (query) {
       const q = query.toLowerCase();
-      const match = !p.name?.toLowerCase().includes(q)
-        && !p.park?.toLowerCase().includes(q)
-        && !p.type?.toLowerCase().includes(q)
-        && !p.industry?.toLowerCase().includes(q);
-      if (match) return false;
+      const nameOk = !p.name || p.name.toLowerCase().includes(q);
+      const parkOk = !p.park || p.park.toLowerCase().includes(q);
+      const typeOk = !p.type || p.type.toLowerCase().includes(q);
+      const indOk = !p.industry || p.industry.toLowerCase().includes(q);
+      if (!nameOk || !parkOk || !typeOk || !indOk) return false;
     }
     if (type && p.type !== type) return false;
     if (areaMin && p.areaMax != null && p.areaMax < areaMin) return false;

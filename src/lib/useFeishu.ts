@@ -1,189 +1,134 @@
 /**
- * 飞书数据 Hook — 优先 Workers API，失配时降级到 Mock
+ * 飞书数据 Hook — 静态 JSON 模式
+ * 数据来源: /public/data/*.json
  */
 import { useState, useEffect, useCallback } from "react";
-import {
-  getWorkersConfig as getFeishuConfig,
-  fetchPoliciesFromWorkers as fetchPoliciesFromFeishu,
-  fetchNewsFromWorkers as fetchNewsFromFeishu,
-  type SheetData,
-  type NewsItem,
-} from "./workers";
-import { loadPropertyData } from "./policy";
+import { loadPropertyData } from "./property";
 import { MOCK_POLICIES, MOCK_OPTIONS } from "../app/policy/mockData";
 import type { FilterOptions, PolicyResult } from "../app/policy/types";
-import type { Unit } from "./policy";
+import type { NewsItem } from "./tauri";
+
+// ── 静态 JSON 加载 ─────────────────────────────────────────────────────────
+
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+  return res.json();
+}
+
+async function loadPoliciesStatic(): Promise<PolicyResult[]> {
+  type SheetData = { headers: string[]; data: Record<string, unknown>[] };
+  const sheet = await fetchJSON<SheetData>("/data/policies.json");
+  const { headers, data } = sheet;
+  return data.map((row, i) => {
+    const get = (key: string): unknown => {
+      const idx = headers.indexOf(key);
+      return idx >= 0 ? row[headers[idx]] : undefined;
+    };
+    const parseDate = (v: unknown): string | null => {
+      if (!v) return null;
+      const s = String(v);
+      return s.length >= 10 ? s.substring(0, 10) : s;
+    };
+    return {
+      id: String(get("id") ?? i),
+      name: String(get("policyName") ?? ""),
+      end_date: parseDate(get("end")),
+      zcReleaseTime: String(get("zcReleaseTime") ?? ""),
+      amount: (() => { const v = get("amount"); if (!v || v === "—" || v === "待定") return null; const n = Number(v); return isNaN(n) ? null : n; })(),
+      amount_s: String(get("amount_s") ?? "待定"),
+      method: String(get("claimMethod") ?? ""),
+      area: String(get("applicableRegion") ?? ""),
+      dept: String(get("leadDepartment") ?? ""),
+      industry: String(get("行业标签") ?? ""),
+      subject: String(get("申报主体") ?? ""),
+      threshold: String(get("门槛标签") ?? ""),
+      cap: String(get("政策能力") ?? ""),
+      content: String(get("policyContent") ?? ""),
+      contentHtml: String(get("policyContent") ?? ""),
+      policyObject: String(get("policyObject") ?? ""),
+      policyCondition: String(get("policyCondition") ?? ""),
+      paymentStandard: String(get("paymentStandard") ?? ""),
+      contactInfo: String(get("contactInfo") ?? ""),
+      specialAbbreviat: String(get("specialAbbreviat") ?? ""),
+      expired: false,
+      days_left: 9999,
+      _group: false,
+      _reasons: [],
+    } as PolicyResult;
+  });
+}
+
+async function loadNewsStatic(): Promise<NewsItem[]> {
+  return fetchJSON<NewsItem[]>("/data/news.json");
+}
+
+// ── normalize & buildOptions ───────────────────────────────────────────
+
+function normalizePolicies(rows: PolicyResult[]): PolicyResult[] {
+  return rows.map(r => ({
+    ...r,
+    end_date: r.end_date || null,
+    expired: !!r.expired,
+    days_left: r.days_left ?? 9999,
+  }));
+}
 
 function buildOptions(policies: PolicyResult[]): FilterOptions {
   const locations = new Set<string>();
   const industries = new Set<string>();
   const depts = new Set<string>();
-  const subjects = new Set<string>();
-  const caps = new Set<string>();
-  const thresholds = new Set<string>();
 
   for (const p of policies) {
-    if (p.area) for (const a of p.area.split(/[/\n]/)) { const t = a.trim(); if (t) locations.add(t); }
-    if (p.industry) for (const i of p.industry.split(/[/\n]/)) { const t = i.trim(); if (t) industries.add(t); }
+    if (p.area) locations.add(p.area);
+    if (p.industry) {
+      for (const part of p.industry.split(/\s*\/\s*/)) {
+        const t = part.trim();
+        if (t && t !== "[待复核]" && t !== "[已下架]") industries.add(t);
+      }
+    }
     if (p.dept) depts.add(p.dept);
-    if (p.subject) subjects.add(p.subject);
-    if (p.cap) for (const c of p.cap.split(/[/\n]/)) { const t = c.trim(); if (t) caps.add(t); }
-    if (p.threshold) thresholds.add(p.threshold);
   }
 
-  const make = (set: Set<string>) =>
-    [...set].sort().map(v => ({ k: v, l: v }));
-
   return {
-    locations: make(locations),
-    industries: make(industries),
-    depts: make(depts),
-    subjects: make(subjects),
-    caps: make(caps),
-    thresholds: make(thresholds),
+    locations: Array.from(locations).sort().map(l => ({ k: l, l })),
+    industries: Array.from(industries).sort().map(l => ({ k: l, l })),
+    caps: [],
+    thresholds: [],
+    depts: Array.from(depts).sort().map(l => ({ k: l, l, cnt: 1 })),
+    subjects: [],
     total: policies.length,
   };
 }
 
-// ── 政策数据转换 ──────────────────────────────────────────────────────────────
-function normalizePolicies(raw: SheetData) {
-  return raw.data.map((row, i) => {
-    // 提取字段值，处理好对象/数组等复杂类型
-    const str = (keys: string[]) => {
-      for (const k of keys) {
-        const v = row[k];
-        if (v == null || v === "") continue;
-        if (typeof v === "string") return v;
-        if (typeof v === "number") return String(v);
-        if (Array.isArray(v)) {
-          // 飞书内容列可能是 [{text, type, link?}] 数组，提取纯文本
-          return v.map(item => {
-            if (typeof item === "object" && item !== null && "text" in item) {
-              return (item as {text?: string}).text || "";
-            }
-            return String(item);
-          }).join("");
-        }
-        if (typeof v === "object") {
-          // 可能是 {"text": "...", "type": "text", "link": "..."} 结构
-          const obj = v as Record<string, unknown>;
-          if (obj.text != null) return String(obj.text);
-          return JSON.stringify(v);
-        }
-        return String(v);
-      }
-      return "";
-    };
-    const num = (keys: string[]) => {
-      for (const k of keys) {
-        const v = row[k];
-        if (v == null) continue;
-        if (typeof v === "number") return v;
-        if (typeof v === "string") {
-          if (v === "None" || v === "null" || v === "") return 0;
-          const n = parseFloat(v);
-          return isNaN(n) ? 0 : n;
-        }
-      }
-      return 0;
-    };
-
-    const amount = num(["amount", "金额", "amount_s"]);
-    const endDate = str(["end", "申报截止", "截止日期"]);
-    const releaseDate = str(["zcReleaseTime", "发布时间", "发布于"]);
-
-    let days_left = 9999;
-    let expired = false;
-    if (endDate) {
-      const end = new Date(endDate);
-      const now = new Date();
-      if (!isNaN(end.getTime())) {
-        const diff = Math.ceil((end.getTime() - now.getTime()) / 86400000);
-        days_left = diff;
-        expired = diff <= 0;
-      }
-    }
-
-    const raw_amount_s = str(["amount_s", "金额_显示", "资助金额"]);
-    let amount_s: string;
-    if (raw_amount_s && raw_amount_s !== "None") {
-      amount_s = raw_amount_s;
-    } else {
-      amount_s = amount > 0
-        ? amount >= 10000 ? `${(amount / 10000).toFixed(0)}亿` : `${amount}万元`
-        : "待定";
-    }
-
-    return {
-      _group: false,
-      name: str(["policyName", "政策名称", "name"]) || `政策${i + 1}`,
-      amount,
-      amount_s,
-      zcReleaseTime: releaseDate,
-      end_date: endDate,
-      days_left,
-      expired,
-      method: str(["claimMethod", "兑现方式", "method"]),
-      dept: str(["leadDepartment", "发布单位", "dept"]),
-      area: str(["applicableRegion", "适用区域", "area"]),
-      industry: str(["行业标签", "适用行业", "industry"]),
-      subject: str(["申报主体", "subject"]),
-      threshold: str(["门槛标签", "threshold"]),
-      cap: str(["政策能力", "cap"]),
-      content: str(["policyContent", "政策内容", "content", "主要内容"]),
-      contentHtml: "",
-      policyObject: str(["policyObject", "政策对象"]),
-      policyCondition: str(["policyCondition", "申报条件"]),
-      paymentStandard: str(["paymentStandard", "扶持标准"]),
-      contactInfo: str(["contactInfo", "联系方式"]),
-      _reasons: [] as string[],
-      stars: calcStars(amount),
-    };
-  });
-}
-
-function calcStars(amount: number): string {
-  if (amount >= 300) return "★★★";
-  if (amount >= 100) return "★★☆";
-  if (amount > 0) return "★☆☆";
-  return "☆☆☆";
-}
-
-// ── 物业数据转换 ──────────────────────────────────────────────────────────────
-
-
-// ── Hooks ────────────────────────────────────────────────────────────────────
+// ── Hooks ────────────────────────────────────────────────────────────────
 
 export function usePolicies() {
-  const [policies, setPolicies] = useState(MOCK_POLICIES);
+  const [policies, setPolicies] = useState<PolicyResult[]>(MOCK_POLICIES);
   const [options, setOptions] = useState<FilterOptions>(MOCK_OPTIONS);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fromFeishu, setFromFeishu] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const cfg = await getFeishuConfig();
-      if (cfg.has_credentials) {
-        const raw = await fetchPoliciesFromFeishu();
-        if (raw.data.length > 0) {
-          const normalized = normalizePolicies(raw);
-          setPolicies(normalized);
-          const built = buildOptions(normalized);
-          // 动态构建缺字段时用 MOCK_OPTIONS 兜底
-          const opts: FilterOptions = {
-            ...built,
-            caps: built.caps.length > 0 ? built.caps : MOCK_OPTIONS.caps,
-            thresholds: built.thresholds.length > 0 ? built.thresholds : MOCK_OPTIONS.thresholds,
-          };
-          setOptions(opts);
-          setFromFeishu(true);
-          setLoading(false);
-          return;
-        }
+      const data = await loadPoliciesStatic();
+      if (data.length > 0) {
+        const normalized = normalizePolicies(data);
+        setPolicies(normalized);
+        const built = buildOptions(normalized);
+        const opts: FilterOptions = {
+          ...built,
+          caps: built.caps.length > 0 ? built.caps : MOCK_OPTIONS.caps,
+          thresholds: built.thresholds.length > 0 ? built.thresholds : MOCK_OPTIONS.thresholds,
+        };
+        setOptions(opts);
+        setFromFeishu(true);
+        setLoading(false);
+        return;
       }
-    } catch {
-      // 降级到 mock
+    } catch (e) {
+      console.warn("[usePolicies] load error:", e);
     }
     setPolicies(MOCK_POLICIES);
     setOptions(MOCK_OPTIONS);
@@ -197,18 +142,18 @@ export function usePolicies() {
 }
 
 export function useProperties() {
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [buildings, setBuildings] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     loadPropertyData()
-      .then(({ units: u }) => { setUnits(u); })
-      .catch(() => { setUnits([]); })
+      .then(({ buildings: b }) => { setBuildings(b); })
+      .catch(() => { setBuildings([]); })
       .finally(() => { setLoading(false); });
   }, []);
 
-  return { properties: units, loading };
+  return { properties: buildings, loading };
 }
 
 export function useNews() {
@@ -218,13 +163,10 @@ export function useNews() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const cfg = await getFeishuConfig();
-      if (cfg.has_credentials) {
-        const items = await fetchNewsFromFeishu();
-        setNews(items);
-      }
-} catch (e) {
-      console.error("[useNews] fetch error:", e);
+      const items = await loadNewsStatic();
+      setNews(items);
+    } catch (e) {
+      console.error("[useNews] load error:", e);
     } finally {
       setLoading(false);
     }

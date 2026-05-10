@@ -191,9 +191,9 @@ def export_properties(token, out_dir, key, range_str="A1:ZZ500"):
     if not rows or len(rows) < 3:
         log(f"    跳过（数据不足 {len(rows) if rows else 0} 行）")
         return
-    headers = [str(h) if h is not None else "" for h in rows[0]]
+    headers = [str(h) if h is not None else "" for h in rows[1]]
     data = []
-    for row in rows[1:]:
+    for row in rows[2:]:
         if not isinstance(row, list) or not row:
             continue
         normalized = normalize_row(row)

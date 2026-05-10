@@ -1,0 +1,48 @@
+name: Purge CDN Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "清理范围"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - "both"
+          - "pudong.198857.sbs"
+          - "property-match-tauri.pages.dev"
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge Cloudflare CDN cache
+        run: |
+          DOMAINS=""
+          if [ "$SCOPE" = "both" ]; then
+            DOMAINS="[\"https://pudong.198857.sbs/\",\"https://property-match-tauri.pages.dev/\"]"
+          else
+            DOMAINS="[\"https://${SCOPE}/\"]"
+          fi
+          echo "正在清理 CDN 缓存: $SCOPE"
+          echo "DOMAINS: $DOMAINS"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"files\":${DOMAINS}}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ 缓存清理成功"
+          else
+            echo "❌ 缓存清理失败"
+            exit 1
+          fi
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          SCOPE: ${{ github.event.inputs.scope }}
