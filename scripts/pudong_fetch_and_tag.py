@@ -18,11 +18,12 @@ from playwright.sync_api import sync_playwright
 # ═══════════════════════════════════════════════════════════════
 # 全局配置
 # ═══════════════════════════════════════════════════════════════
-DOWNLOADS   = "/Users/els/Downloads"
+DOWNLOADS   = "/tmp/pudong_downloads"
 EXCEL_RAW   = os.path.join(DOWNLOADS, "pudong_policy_full_v2.xlsx")
 EXCEL_OUT   = os.path.join(DOWNLOADS, "pudong_policy_full_v2_for_feishu.xlsx")
 LOG_DIR     = "/tmp/pudong_sync_logs"
 os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(DOWNLOADS, exist_ok=True)
 
 LIST_URL   = "https://pyd.pudong.gov.cn/pd-api/dataCenterXcx/special/list"
 DETAIL_URL = "https://pyd.pudong.gov.cn/pd-api/dataCenterXcx/special/getInfo"
