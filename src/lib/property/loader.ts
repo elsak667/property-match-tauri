@@ -85,7 +85,8 @@ function normalizeRecord<T>(record: Record<string, unknown>, fieldMap: Record<st
 }
 
 function isHeaderRow(record: Record<string, unknown>): boolean {
-  return record["楼宇ID"] === "楼宇ID" || record["园区ID"] === "园区ID" || record["单元ID"] === "单元ID";
+  const v = Object.values(record)[0];
+  return typeof v === "string" && /^[a-z_]+$/.test(v);
 }
 
 function normalizeArray<T>(arr: Record<string, unknown>[], fieldMap: Record<string, string>): T[] {
