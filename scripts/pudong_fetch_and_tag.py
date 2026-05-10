@@ -251,6 +251,10 @@ def step1_fetch(pudong_token):
         elif api_list_success:
             _save_excel_17(existing, EXCEL_RAW)
             log("  全部完成，无需抓取")
+        else:
+            # API 无响应或无数据时，保存空文件防止后续 step 报错
+            _save_excel_17({}, EXCEL_RAW)
+            log("  ⚠️ API 无响应，已创建空 Excel")
         return bool(api_list_success) or len(existing) > 0
 
     ok = fail = 0
