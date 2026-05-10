@@ -27,11 +27,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 LIST_URL   = "https://pyd.pudong.gov.cn/pd-api/dataCenterXcx/special/list"
 DETAIL_URL = "https://pyd.pudong.gov.cn/pd-api/dataCenterXcx/special/getInfo"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 MicroWechat/7.0.20.1781 NetType/WIFI MiniProgramEnv/Mac MacWechat/WMPF MacWechat/3.8.7(0x13080712) XWEB/16962",
-    "Referer": "https://servicewechat.com/wxd5670d675e9994fd/5/page-frame.html",
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Accept": "*/*",
-    "xweb_xhr": "1"
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_4_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.73(0x18004923) NetType/WIFI Language/zh_CN",
+    "Referer": "https://servicewechat.com/wxd5670d675e9994fd/10/page-frame.html",
+    "Content-Type": "application/json; charset=utf-8",
+    "Accept": "application/json, text/plain, */*",
+    "terminal-type": "h5",
 }
 
 # 飞书
@@ -184,7 +184,7 @@ def strip_feishu_rich(val):
 # ═══════════════════════════════════════════════════════════════
 # Step 1: 增量抓取
 # ═══════════════════════════════════════════════════════════════
-def step1_fetch(sgin):
+def step1_fetch(pudong_token):
     log("═" * 60)
     log("Step 1: 增量抓取")
     log("═" * 60)
@@ -207,15 +207,16 @@ def step1_fetch(sgin):
     api_ids = set()
     api_list_success = False
     page = 1
+    auth_headers = {**HEADERS, "Authorization": f"Bearer {pudong_token}"}
     while True:
         url = f"{LIST_URL}?pageNum={page}&pageSize=50&orderType=2"
         try:
-            resp = requests.get(url, headers={**HEADERS, "sgin": sgin}, timeout=15).json()
+            resp = requests.get(url, headers=auth_headers, timeout=15).json()
         except Exception as e:
             log(f"\n  网络错误: {e}")
             break
         if resp.get("_auth_error"):
-            log(f"\n  ⚠️ sgin已过期，保留已有数据")
+            log(f"\n  ⚠️ Token已过期，保留已有数据")
             break
         rows = resp.get("data", {}).get("rows", [])
         if not rows:
@@ -252,12 +253,12 @@ def step1_fetch(sgin):
     for i, pid in enumerate(to_fetch):
         url = f"{DETAIL_URL}?id={pid}"
         try:
-            r = requests.get(url, headers={**HEADERS, "sgin": sgin}, timeout=15).json()
+            r = requests.get(url, headers=auth_headers, timeout=15).json()
         except Exception as e:
             log(f"\n  网络错误: {e}")
             break
         if r.get("_auth_error"):
-            log(f"\n  ⚠️ sgin过期，已抓{ok}条")
+            log(f"\n  ⚠️ Token过期，已抓{ok}条")
             break
         d = r.get("data", {})
         if d and d.get("specialName"):
@@ -830,19 +831,15 @@ def step3_sync():
         # 按行号降序排序，从后往前删
         deleted_rows = sorted([feishu_index[did][0] for did in deleted_ids if did in feishu_index], reverse=True)
         for rn in deleted_rows:
-            # 使用飞书 API 删除行
+            # 使用飞书 API 删除行（dimension_range/delete 接口）
             resp = feishu_post(
-                f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/sheets/{FEISHU['sheet_id']}/operations/batch_update",
+                f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/sheets/{FEISHU['sheet_id']}/dimension_range/delete",
                 {
-                    "requests": [
-                        {
-                            "deleteDimension": {
-                                "majorDimension": "ROWS",
-                                "startIndex": rn - 1,  # 转换为 0-based
-                                "endIndex": rn  # 删除一行
-                            }
-                        }
-                    ]
+                    "dimension": {
+                        "majorDimension": "ROWS",
+                        "startIndex": rn - 1,
+                        "endIndex": rn
+                    }
                 },
                 token
             )
@@ -1094,10 +1091,10 @@ def step5_generate_embeddings():
     log("  提示: 将此 JSON 上传到 Worker KV，查询时做余弦相似度匹配")
 def main():
     parser = argparse.ArgumentParser(description="浦东政策抓取+标签生成+飞书同步")
-    parser.add_argument("--step4-only", action="store_true", help="只跑 Step 4 更新统计表（无需 sgin）")
-    parser.add_argument("--sgin", required=False, help="浦东API sgin")
+    parser.add_argument("--step4-only", action="store_true", help="只跑 Step 4 更新统计表（无需 token）")
+    parser.add_argument("--pudong-token", required=False, help="浦东API Bearer Token")
     parser.add_argument("--embeddings", action="store_true",
-                        help="生成政策 embedding 向量（需先运行 --sgin 完成前4步）")
+                        help="生成政策 embedding 向量（需先完成前4步）")
     args = parser.parse_args()
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1110,7 +1107,10 @@ def main():
     elif args.embeddings:
         step5_generate_embeddings()
     else:
-        step1_fetch(args.sgin.strip() if args.sgin else "")
+        pudong_token = args.pudong_token.strip() if args.pudong_token else os.environ.get("PUYD_BEARER_TOKEN", "")
+        if not pudong_token:
+            fatal("请提供 --pudong-token 参数或设置 PUYD_BEARER_TOKEN 环境变量")
+        step1_fetch(pudong_token)
         step2_tags()
         step3_sync()
         step4_update_stats()
