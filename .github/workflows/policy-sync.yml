@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       full_sync:
-        description: "跑完整流程（需要 sgin，否则只跑 Step 4）"
+        description: "跑完整流程（需要 pudong-token，否则只跑 Step 4）"
         required: false
         default: "false"
         type: boolean
-      sgin:
-        description: "浦东 API sgin（full_sync=true 时需要）"
+      pudong_token:
+        description: "浦东 API Bearer Token（full_sync=true 时需要）"
         required: false
         type: string
 
@@ -20,6 +20,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,17 +40,17 @@ jobs:
         run: playwright install chromium --with-deps
         shell: bash
 
-      - name: Run Step 4 only (scheduled or no sgin)
-        if: github.event.inputs.sgin == '' || github.event.inputs.sgin == null
+      - name: Run Step 4 only (scheduled or no pudong-token)
+        if: github.event.inputs.pudong_token == '' || github.event.inputs.pudong_token == null
         run: python3 scripts/pudong_fetch_and_tag.py --step4-only
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
 
-      - name: Run full sync (manual with sgin)
-        if: github.event.inputs.full_sync == 'true' && github.event.inputs.sgin != ''
-        run: python3 scripts/pudong_fetch_and_tag.py --sgin "${{ github.event.inputs.sgin }}"
+      - name: Run full sync (manual with pudong-token)
+        if: github.event.inputs.full_sync == 'true' && github.event.inputs.pudong_token != ''
+        run: python3 scripts/pudong_fetch_and_tag.py --pudong-token "${{ github.event.inputs.pudong_token }}"
         shell: bash
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
