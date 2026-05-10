@@ -391,7 +391,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   }
 
   return (
-    <div className="cp-root" style={{ display: 'flex', height: 'var(--cp-root-height, calc(100vh - 120px))', overflow: 'hidden', background: 'var(--bg-base)' }}>
+    <div className="cp-root">
       {/* ── 品牌 Hero 横条 ── */}
       <div className="cp-hero-banner">
         <div className="cp-hero-brand">
@@ -407,6 +407,8 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           <span className="cp-hero-stat"><strong>{parkCount}</strong> 园区</span>
         </div>
       </div>
+      {/* 左侧 + 主内容区 */}
+      <div className="cp-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* 左侧 */}
       <div className="cp-sidebar">
         {/* 搜索栏 */}
@@ -765,6 +767,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           </div>
         </div>
       )}
+      </div>{/* end cp-body */}
     </div>
   );
 }
