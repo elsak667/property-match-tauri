@@ -210,12 +210,17 @@ def step1_fetch(pudong_token):
     page = 1
     auth_headers = {**HEADERS, "Authorization": f"Bearer {pudong_token}"}
     while True:
-        url = f"{LIST_URL}?pageNum={page}&pageSize=50&orderType=2"
+        # 尝试 POST 方式（浦东 API 可能需要 body 参数）
+        payload = {"pageNum": page, "pageSize": 50, "orderType": 2}
         try:
-            resp = requests.get(url, headers=auth_headers, timeout=15).json()
-        except Exception as e:
-            log(f"\n  网络错误: {e}")
-            break
+            resp = requests.post(LIST_URL, headers=auth_headers, json=payload, timeout=15).json()
+        except Exception:
+            # 降级到 GET
+            try:
+                resp = requests.get(f"{LIST_URL}?pageNum={page}&pageSize=50&orderType=2", headers=auth_headers, timeout=15).json()
+            except Exception as e:
+                log(f"\n  网络错误: {e}")
+                break
         if resp.get("_auth_error"):
             log(f"\n  ⚠️ Token已过期，保留已有数据")
             break
@@ -839,20 +844,16 @@ def step3_sync():
         # 按行号降序排序，从后往前删
         deleted_rows = sorted([feishu_index[did][0] for did in deleted_ids if did in feishu_index], reverse=True)
         for rn in deleted_rows:
-            # 使用飞书 API 删除行（dimension_range/delete 接口）
+            # 用空行清空代替删除（飞书行删除 API 结构复杂）
+            range_a = f"A{rn}"
+            range_b = f"{chr(ord('A') + len(FEISHU_SCHEMA) - 1)}{rn}"
             resp = feishu_post(
-                f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/sheets/{FEISHU['sheet_id']}/dimension_range/delete",
-                {
-                    "dimension": {
-                        "majorDimension": "ROWS",
-                        "startIndex": rn - 1,
-                        "endIndex": rn
-                    }
-                },
+                f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/values_batch_update",
+                {"valueRanges": [{"range": f"{FEISHU['sheet_id']}!{range_a}:{range_b}", "values": [["" for _ in FEISHU_SCHEMA]]}]},
                 token
             )
             status = "✓" if resp.get("code") == 0 else f"✗ {resp.get('msg')}"
-            log(f"  删除行{rn}: {status}")
+            log(f"  清空行{rn}: {status}")
             time.sleep(0.1)
 
         # 删除行后，重新读取飞书数据，更新行号映射
