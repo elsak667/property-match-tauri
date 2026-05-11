@@ -99,7 +99,52 @@ export interface PropertyFilterUnit {
   park_name: string;
   district: string;
   industry: string;
+  is_104_block: string;
   remark: string;
+}
+
+// ── 静态 JSON 筛选（前端实现）───────────────────────────────────────────────
+let _filterableCache: PropertyFilterUnit[] | null = null;
+
+async function loadFilterableData(): Promise<PropertyFilterUnit[]> {
+  if (_filterableCache) return _filterableCache;
+  const res = await fetch("/data/properties-filterable.json");
+  if (!res.ok) throw new Error(`Failed to load filterable data: ${res.status}`);
+  _filterableCache = await res.json() as PropertyFilterUnit[];
+  return _filterableCache;
+}
+
+export async function filterPropertiesStatic(params: {
+  park?: string;
+  area_min?: number;
+  area_max?: number;
+  price_max?: number;
+  load_min?: number;
+  height_min?: number;
+  power_kv_min?: number;
+  is104?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PropertyFilterResult> {
+  const data = await loadFilterableData();
+  const page = params.page ?? 1;
+  const pageSize = params.page_size ?? 500;
+
+  const filtered = data.filter(u => {
+    if (params.park && u.park_id !== params.park) return false;
+    if (params.area_max != null && (u.area_vacant == null || u.area_vacant > params.area_max)) return false;
+    if (params.area_min != null && (u.area_vacant == null || u.area_vacant < params.area_min)) return false;
+    if (params.price_max != null && (u.price == null || u.price > params.price_max)) return false;
+    if (params.load_min != null && (u.load == null || u.load < params.load_min)) return false;
+    if (params.height_min != null && (u.floor_height == null || u.floor_height < params.height_min)) return false;
+    if (params.is104 && u.is_104_block !== params.is104) return false;
+    return true;
+  });
+
+  const start = (page - 1) * pageSize;
+  const results = filtered.slice(start, start + pageSize);
+
+  return { total: filtered.length, page, page_size: pageSize, results };
 }
 
 export const filterProperties = (params: Record<string, string | number | undefined>) => {
