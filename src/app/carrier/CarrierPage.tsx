@@ -238,7 +238,11 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
             area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
             price: b.price ?? null,
+<<<<<<< HEAD
         }));
+=======
+          }));
+>>>>>>> 0af4032 (fix(carrier): add null checks for filtered before showing compare buttons/panel)
         setAllBuildings(summaries);
         setLoading(false);
       })
@@ -638,7 +642,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             >
               <Icon.chart /> {compareMode ? "退出对比" : "对比模式"}
             </button>
-            {compareIds.size >= 2 && (
+            {compareIds.size >= 2 && filtered !== null && (
               <button className="cp-btn-compare" onClick={() => setShowCompare(true)}>
                 <Icon.chart /> 对比 {compareIds.size}
               </button>
@@ -722,7 +726,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => { setCompareIds(new Set()); }}>清空</button>
-            {compareIds.size >= 2 && (
+            {compareIds.size >= 2 && filtered !== null && (
               <button className="btn-primary" style={{ fontSize: 12, padding: "6px 16px" }} onClick={() => setShowCompare(true)}>
                 <Icon.chart /> 开始对比
               </button>
@@ -735,7 +739,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
       )}
 
       {/* 对比面板 */}
-      {showCompare && compareUnits.length >= 2 && (
+      {showCompare && filtered !== null && compareUnits.length >= 2 && (
         <div className="cp-compare-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCompare(false); }}>
           <div className="cp-compare-panel">
             <div className="cp-compare-header">
