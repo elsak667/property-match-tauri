@@ -222,20 +222,23 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         for (const p of parks) {
           if (p.park_id) parkNameMap[p.park_id] = p.name ?? "";
         }
-        const summaries: BuildingSummary[] = buildings.map(b => ({
-          building_id: b.building_id ?? "",
-          name: b.name ?? "",
-          industry: b.industry ?? "",
-          lat: b.lat ?? null,
-          lng: b.lng ?? null,
-          park_id: b.park_id ?? "",
-          park_name: parkNameMap[b.park_id ?? ""] ?? "",
-          district: (b.district ?? "") || "",
-          floors: b.floors ?? 0,
-          area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
-          area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
-          price: b.price ?? null,
-        }));
+        // Only include buildings that have unit data
+        const summaries: BuildingSummary[] = buildings
+          .filter(b => areaTotalMap[b.building_id ?? ""] > 0)
+          .map(b => ({
+            building_id: b.building_id ?? "",
+            name: b.name ?? "",
+            industry: b.industry ?? "",
+            lat: b.lat ?? null,
+            lng: b.lng ?? null,
+            park_id: b.park_id ?? "",
+            park_name: parkNameMap[b.park_id ?? ""] ?? "",
+            district: (b.district ?? "") || "",
+            floors: b.floors ?? 0,
+            area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
+            area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
+            price: b.price ?? null,
+          }));
         setAllBuildings(summaries);
         setLoading(false);
       })
@@ -635,7 +638,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             >
               <Icon.chart /> {compareMode ? "退出对比" : "对比模式"}
             </button>
-            {compareIds.size >= 2 && (
+            {compareIds.size >= 2 && filtered !== null && (
               <button className="cp-btn-compare" onClick={() => setShowCompare(true)}>
                 <Icon.chart /> 对比 {compareIds.size}
               </button>
@@ -719,7 +722,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => { setCompareIds(new Set()); }}>清空</button>
-            {compareIds.size >= 2 && (
+            {compareIds.size >= 2 && filtered !== null && (
               <button className="btn-primary" style={{ fontSize: 12, padding: "6px 16px" }} onClick={() => setShowCompare(true)}>
                 <Icon.chart /> 开始对比
               </button>
@@ -732,7 +735,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
       )}
 
       {/* 对比面板 */}
-      {showCompare && compareUnits.length >= 2 && (
+      {showCompare && filtered !== null && compareUnits.length >= 2 && (
         <div className="cp-compare-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCompare(false); }}>
           <div className="cp-compare-panel">
             <div className="cp-compare-header">
