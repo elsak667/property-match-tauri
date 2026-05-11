@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useRef } from "react";
 import L from "leaflet";
-import { fetchBuildingDetail, type BuildingDetail } from "../lib/workers";
+import { fetchBuildingDetailStatic, type BuildingDetail } from "../lib/workers";
 import { Icon } from "./Icons";
 
 // 园区中心坐标（与 PropertyMap.ts 保持一致）
@@ -47,7 +47,7 @@ export default function BuildingDetailPanel({ buildingId, onClose }: Props) {
   const mapInstRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    fetchBuildingDetail(buildingId)
+    fetchBuildingDetailStatic(buildingId)
       .then(d => { setDetail(d); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [buildingId]);

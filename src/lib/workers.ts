@@ -180,6 +180,52 @@ export interface BuildingDetail {
   }[];
 }
 
+let _buildingDetailCache: PropertyFilterUnit[] | null = null;
+
+async function loadForDetail(): Promise<PropertyFilterUnit[]> {
+  if (_buildingDetailCache) return _buildingDetailCache;
+  const res = await fetch("/data/properties-filterable.json");
+  if (!res.ok) throw new Error(`Failed to load filterable data: ${res.status}`);
+  _buildingDetailCache = await res.json() as PropertyFilterUnit[];
+  return _buildingDetailCache;
+}
+
+export async function fetchBuildingDetailStatic(buildingId: string): Promise<BuildingDetail> {
+  const data = await loadForDetail();
+  const units = data.filter(u => u.building_id === buildingId);
+  if (units.length === 0) {
+    return {
+      building: { building_id: buildingId, name: "", industry: "", has_crane_beam: false, lat: null, lng: null, park_id: "", park_name: "", district: "" },
+      units: [],
+    };
+  }
+  const first = units[0];
+  return {
+    building: {
+      building_id: first.building_id,
+      name: first.building_name,
+      industry: first.industry,
+      has_crane_beam: false,
+      lat: first.building_lat,
+      lng: first.building_lng,
+      park_id: first.park_id,
+      park_name: first.park_name,
+      district: first.district,
+    },
+    units: units.map(u => ({
+      unit_id: u.unit_id,
+      unit_no: u.unit_no,
+      floor: u.floor,
+      area_total: u.area_total,
+      area_vacant: u.area_vacant,
+      price: u.price,
+      floor_height: u.floor_height,
+      load: u.load,
+      remark: u.remark,
+    })),
+  };
+}
+
 export const fetchBuildingDetail = (buildingId: string) =>
   request<BuildingDetail>(`/building-detail?building_id=${encodeURIComponent(buildingId)}`);
 
