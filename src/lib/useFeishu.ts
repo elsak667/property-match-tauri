@@ -148,7 +148,17 @@ export function useProperties() {
   useEffect(() => {
     setLoading(true);
     loadPropertyData()
-      .then(({ buildings: b }) => { setBuildings(b); })
+      .then(({ buildings: b, units }) => {
+        const areaTotalMap: Record<string, number> = {};
+        for (const u of units) {
+          if (!u.building_id) continue;
+          areaTotalMap[u.building_id] = (areaTotalMap[u.building_id] ?? 0) + (u.area_total ?? 0);
+        }
+        setBuildings(b.filter((bb: unknown) => {
+          const bid = (bb as { building_id?: string }).building_id;
+          return areaTotalMap[bid ?? ""] > 0;
+        }));
+      })
       .catch(() => { setBuildings([]); })
       .finally(() => { setLoading(false); });
   }, []);
