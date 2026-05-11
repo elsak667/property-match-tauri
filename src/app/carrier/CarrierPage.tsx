@@ -380,9 +380,20 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     setShowFilter(true);
   }
 
-  // 对比数据（基于 filter 结果）
+  // 对比数据（基于 filter 结果，每楼栋取第一个单元，避免重复列）
   const resultUnits = filtered?.results ?? [];
-  const compareUnits = resultUnits.filter(u => compareIds.has(u.building_id));
+  const compareUnits = (() => {
+    const seen = new Set<string>();
+    const units: PropertyFilterResult["results"] = [];
+    for (const u of resultUnits) {
+      if (!compareIds.has(u.building_id)) continue;
+      if (!seen.has(u.building_id)) {
+        seen.add(u.building_id);
+        units.push(u);
+      }
+    }
+    return units;
+  })();
 
   if (loading) {
     return (
