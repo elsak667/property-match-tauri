@@ -222,19 +222,22 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
         for (const p of parks) {
           if (p.park_id) parkNameMap[p.park_id] = p.name ?? "";
         }
-        const summaries: BuildingSummary[] = buildings.map(b => ({
-          building_id: b.building_id ?? "",
-          name: b.name ?? "",
-          industry: b.industry ?? "",
-          lat: b.lat ?? null,
-          lng: b.lng ?? null,
-          park_id: b.park_id ?? "",
-          park_name: parkNameMap[b.park_id ?? ""] ?? "",
-          district: (b.district ?? "") || "",
-          floors: b.floors ?? 0,
-          area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
-          area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
-          price: b.price ?? null,
+        // Only include buildings that have unit data
+        const summaries: BuildingSummary[] = buildings
+          .filter(b => areaTotalMap[b.building_id ?? ""] > 0)
+          .map(b => ({
+            building_id: b.building_id ?? "",
+            name: b.name ?? "",
+            industry: b.industry ?? "",
+            lat: b.lat ?? null,
+            lng: b.lng ?? null,
+            park_id: b.park_id ?? "",
+            park_name: parkNameMap[b.park_id ?? ""] ?? "",
+            district: (b.district ?? "") || "",
+            floors: b.floors ?? 0,
+            area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
+            area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
+            price: b.price ?? null,
         }));
         setAllBuildings(summaries);
         setLoading(false);
