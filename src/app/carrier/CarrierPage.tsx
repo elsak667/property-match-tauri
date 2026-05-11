@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { loadPropertyData } from "../../lib/property";
-import { filterProperties, type BuildingSummary } from "../../lib/workers";
+import { filterPropertiesStatic, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
 import { Icon } from "../../components/Icons";
 import PropertyMap from "../../components/PropertyMap";
@@ -208,12 +208,19 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   // 加载全量楼栋（用于楼栋列表和地图坐标）
   useEffect(() => {
     loadPropertyData()
-      .then(({ buildings, units }) => {
-        // Build area_total per building from units
-        const areaMap: Record<string, number> = {};
+      .then(({ parks, buildings, units }) => {
+        // Build area_total and area_vacant per building from units
+        const areaTotalMap: Record<string, number> = {};
+        const areaVacantMap: Record<string, number> = {};
         for (const u of units) {
           if (!u.building_id) continue;
-          areaMap[u.building_id] = (areaMap[u.building_id] ?? 0) + (u.area_total ?? 0);
+          areaTotalMap[u.building_id] = (areaTotalMap[u.building_id] ?? 0) + (u.area_total ?? 0);
+          areaVacantMap[u.building_id] = (areaVacantMap[u.building_id] ?? 0) + (u.area_vacant ?? 0);
+        }
+        // Build park_id -> name map
+        const parkNameMap: Record<string, string> = {};
+        for (const p of parks) {
+          if (p.park_id) parkNameMap[p.park_id] = p.name ?? "";
         }
         const summaries: BuildingSummary[] = buildings.map(b => ({
           building_id: b.building_id ?? "",
@@ -222,11 +229,11 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
           lat: b.lat ?? null,
           lng: b.lng ?? null,
           park_id: b.park_id ?? "",
-          park_name: "",
+          park_name: parkNameMap[b.park_id ?? ""] ?? "",
           district: (b.district ?? "") || "",
           floors: b.floors ?? 0,
-          area_total: areaMap[b.building_id ?? ""] ?? 0,
-          area_vacant: b.area_vacant ?? 0,
+          area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
+          area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
           price: b.price ?? null,
         }));
         setAllBuildings(summaries);
@@ -253,7 +260,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
   const doFilter = useCallback(async () => {
     setFiltering(true);
     try {
-      const result = await filterProperties({
+      const result = await filterPropertiesStatic({
         park: fPark || undefined,
         area_min: fAreaMin ? Number(fAreaMin) : undefined,
         area_max: fAreaMax ? Number(fAreaMax) : undefined,

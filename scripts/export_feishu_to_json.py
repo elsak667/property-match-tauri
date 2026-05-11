@@ -257,6 +257,15 @@ def main():
     export_properties(token, out_dir, "properties-units")
     export_stats(token, out_dir)
 
+    # 生成聚合筛选文件
+    import subprocess, sys as _sys
+    script_path = os.path.join(os.path.dirname(__file__), "build-filterable.js")
+    result = subprocess.run([_sys.executable, script_path], capture_output=True, text=True)
+    if result.returncode == 0:
+        log(f"  {result.stdout.strip()}")
+    else:
+        log(f"  ⚠ build-filterable.js failed: {result.stderr.strip()}")
+
     log("✓ 导出完成")
 
 if __name__ == "__main__":
