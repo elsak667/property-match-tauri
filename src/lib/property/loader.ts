@@ -106,7 +106,7 @@ async function fetchJSON<T>(url: string): Promise<T> {
 // ── 物业数据加载 ───────────────────────────────────────────────────────────
 
 export async function loadPropertyData(): Promise<{ parks: Park[]; buildings: Building[]; units: Unit[] }> {
-  return cacheOrRefresh<{ parks: Park[]; buildings: Building[]; units: Unit[] }>("property_data_v2", async () => {
+  return cacheOrRefresh<{ parks: Park[]; buildings: Building[]; units: Unit[] }>("property_data_v3", async () => {
     const [rawParks, rawBuildings, rawUnits] = await Promise.all([
       fetchJSON<Record<string, unknown>[]>(PROPERTY_FILE_URLS["园区"]),
       fetchJSON<Record<string, unknown>[]>(PROPERTY_FILE_URLS["楼宇"]),
