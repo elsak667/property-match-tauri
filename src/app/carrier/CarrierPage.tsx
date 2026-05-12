@@ -238,11 +238,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
             area_total: areaTotalMap[b.building_id ?? ""] ?? 0,
             area_vacant: areaVacantMap[b.building_id ?? ""] ?? 0,
             price: b.price ?? null,
-<<<<<<< HEAD
-        }));
-=======
           }));
->>>>>>> 0af4032 (fix(carrier): add null checks for filtered before showing compare buttons/panel)
         setAllBuildings(summaries);
         setLoading(false);
       })
