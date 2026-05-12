@@ -1,0 +1,57 @@
+name: Pudong Policy Fetch
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"  # 每周一 9:00 北京时间
+  workflow_dispatch:
+    inputs:
+      full_sync:
+        description: "完整抓取（列表+详情+Excel+飞书）"
+        required: false
+        default: "true"
+        type: boolean
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests openpyxl playwright cloakbrowser
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Run fetch script
+        if: github.event.inputs.full_sync != 'false'
+        run: python3 scripts/pudong_fetch.py
+
+      - name: Run process script
+        if: github.event.inputs.full_sync != 'false'
+        run: python3 scripts/pudong_process.py
+
+      - name: Run feishu sync
+        if: github.event.inputs.full_sync != 'false'
+        run: python3 scripts/pudong_sync.py
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_SHEET_TOKEN: ${{ secrets.FEISHU_SHEET_TOKEN }}
+
+      - name: Upload artifacts
+        if: github.event.inputs.full_sync != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pudong-policies-${{ github.run_number }}
+          path: |
+            /tmp/pudong_policies_full.json
+            /tmp/pudong_policies_full.xlsx
+          retention-days: 7
