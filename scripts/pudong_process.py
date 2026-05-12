@@ -6,7 +6,7 @@
 字段：
   id, policyName, r2212SpecialCategoryName,
   policyObject, policyCondition, policyContent,
-  claimMethod, maxPaymentAmount, paymentStandard,
+  claimMethod, amount, paymentStandard,
   leadDepartment, contactInfo,
   declarStartTime, declarEndTime,
   zcReleaseTime
@@ -69,7 +69,7 @@ FIELDS = [
     "policyCondition",
     "policyContent",
     "claimMethod",
-    "maxPaymentAmount",
+    "amount",
     "paymentStandard",
     "leadDepartment",
     "contactInfo",
@@ -104,6 +104,8 @@ def main():
                 val = clean_text(val)
             elif field == "leadDepartment":
                 val = val or item.get("leadDeptName", "")
+            elif field == "amount":
+                val = item.get("fundingAmount", "") or val
 
             row.append(val)
 
