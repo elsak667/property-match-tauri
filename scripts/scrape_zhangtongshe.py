@@ -80,9 +80,17 @@ def fetch_news(limit=50):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto("https://www.zhangtongshe.com/news", wait_until="networkidle", timeout=30000)
-        for _ in range(5):
+        prev_height = 0
+        no_new_content_count = 0
+        while no_new_content_count < 3:
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
+            new_height = page.evaluate("document.body.scrollHeight")
+            if new_height == prev_height:
+                no_new_content_count += 1
+            else:
+                no_new_content_count = 0
+            prev_height = new_height
         text = page.inner_text("body")
         browser.close()
     return parse_news(text, limit)
