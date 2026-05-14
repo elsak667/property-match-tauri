@@ -343,10 +343,13 @@ ${propTable}
   return (
     <>
       {/* 浮窗气泡按钮 */}
-      <button className="ai-fab ai-fab-ai" onClick={() => setOpen(!open)} aria-label="AI助手">
-        <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.botAccent />}</span>
-        {total > 0 && !open && <span className="ai-fab-dot" />}
-      </button>
+      <div className="ai-fab-wrap">
+        <button className="ai-fab ai-fab-ai" onClick={() => setOpen(!open)} aria-label="AI助手">
+          <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.botAccent />}</span>
+          <span className="ai-fab-label">AI助手</span>
+          {total > 0 && !open && <span className="ai-fab-dot" />}
+        </button>
+      </div>
 
       {/* 浮窗面板 */}
       {open && (
