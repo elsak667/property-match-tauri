@@ -30,6 +30,12 @@ def parse_args():
         help="增量模式：从已有 JSON 读已有 ID，追加新数据"
     )
     parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="最多抓取页数（默认自动检测）"
+    )
+    parser.add_argument(
         "--concurrency",
         type=int,
         default=10,
@@ -55,11 +61,7 @@ async def fetch_list(browser):
     page = await ctx.new_page()
 
     def build_url(page_idx):
-        return (
-            f"https://pyd.pudong.gov.cn/pdkjwpolicy-mobileapi/r2509/special/"
-            f"?pageIndex={page_idx}&pageSize=20&businessType=policy"
-            f"&r2509Area=1&r2509IsWebShow=1&ZCZD=1&isWebShow=1"
-        )
+        return f"https://pyd.pudong.gov.cn/pdkjwpolicy-mobileapi/r2509/special/?pageIndex={page_idx}&pageSize=20&businessType=policy&r2509Area=1&r2509IsWebShow=1&ZCZD=1&isWebShow=1"
 
     async def on_response(resp):
         nonlocal total_pages
@@ -84,10 +86,11 @@ async def fetch_list(browser):
 
     page.on("response", on_response)
 
-    await page.goto("https://pyd.pudong.gov.cn/website/pud/policyretrieval", timeout=30000)
+    await page.goto(build_url(1), timeout=30000)
     await page.wait_for_load_state("networkidle")
-    await asyncio.sleep(3)
+    await asyncio.sleep(2)
 
+    # 等待第1页
     for _ in range(40):
         if 1 in collected_pages:
             break
@@ -100,6 +103,7 @@ async def fetch_list(browser):
 
     print(f"检测到总页数：{total_pages}")
 
+    # 翻页
     for page_num in range(2, total_pages + 1):
         if page_num in collected_pages:
             continue
@@ -176,6 +180,7 @@ async def main():
 
     print("开始抓取浦易达政策...")
 
+    # 增量模式：加载已有数据
     all_items = []
     seen_ids = set()
     if args.resume and args.output.exists():
@@ -185,6 +190,7 @@ async def main():
             all_items.append(item)
         print(f"增量模式：已加载 {len(all_items)} 条已有记录")
 
+    # 抓取列表
     print("Step 1: 抓取列表...")
     async with (await browser_launch(headless=True)) as browser:
         new_items = await fetch_list(browser)
@@ -198,6 +204,7 @@ async def main():
 
     print(f"列表抓取完成：{len(all_items)} 条")
 
+    # 详情补全
     if args.max_detail:
         all_items = all_items[:args.max_detail]
 
@@ -207,11 +214,12 @@ async def main():
         tasks = [fetch_detail(browser, item, semaphore) for item in all_items]
 
         done_count = 0
-        for coro in asyncio.as_completed(tasks):
+        for i, coro in enumerate(asyncio.as_completed(tasks), 1):
             result = await coro
             done_count += 1
             print(f"  [{done_count}/{len(all_items)}] {result.get('name', '?')[:40]}")
 
+    # 保存
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(all_items, ensure_ascii=False, indent=2),

@@ -5,7 +5,7 @@
 
 用法：
   python pudong_sync.py                          # 默认处理 /tmp/pudong_policies_full.xlsx
-  python pudong_sync.py -i /path/to/input.xlsx   # 指定输入
+  python pudong_sync.py -i /path/to/input.xlsx  # 指定输入
 """
 import argparse
 import os
@@ -104,6 +104,7 @@ def main():
 
     token = get_feishu_token()
 
+    # 获取飞书当前数据
     feishu_data = []
     row = 2
     while True:
@@ -147,6 +148,7 @@ def main():
         log("无变动")
         return
 
+    # 新增
     if new_records:
         next_row = len(feishu_data) + 2
         end_row = next_row + len(new_records) - 1
@@ -161,6 +163,7 @@ def main():
         else:
             log(f"✗ 新增失败: {resp.get('msg')}")
 
+    # 更新
     for row_num, row_data in updated:
         resp = feishu_post(
             f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/values_batch_update",
