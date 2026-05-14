@@ -30,7 +30,7 @@ jobs:
 
       - name: Run process script
         if: github.event.inputs.full_sync != 'false'
-        run: python3 scripts/pudong_process.py
+        run: python3 scripts/pudong_process.py -i data/pudong_policies.json
 
       - name: Run feishu sync
         if: github.event.inputs.full_sync != 'false'
