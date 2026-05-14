@@ -44,7 +44,7 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           git commit -m "chore: sync Feishu data at $COMMIT_DATE" || exit 0
           git push origin "$BRANCH_NAME"
-          gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body "自动同步飞书数据更新"
+          gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body "自动同步飞书数据更新" --auto-merge
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
