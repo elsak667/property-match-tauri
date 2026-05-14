@@ -76,9 +76,12 @@ export default function Feedback() {
 
   return (
     <>
-      <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
-        <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.messageAccent />}</span>
-      </button>
+      <div className="ai-fab-wrap">
+        <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
+          <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.messageAccent />}</span>
+          <span className="ai-fab-label">意见反馈</span>
+        </button>
+      </div>
 
       {open && (
         <div className="ai-panel ai-panel-feedback" ref={panelRef}>
