@@ -1,18 +1,19 @@
 name: Pudong Policy Fetch
 
 on:
-  schedule:
-    - cron: "0 1 * * 1"  # 每周一 9:00 北京时间
+  push:
+    paths:
+      - 'data/pudong_policies.json'
   workflow_dispatch:
     inputs:
       full_sync:
-        description: "完整抓取（列表+详情+Excel+飞书）"
+        description: "完整处理（process+sync）"
         required: false
         default: "true"
         type: boolean
 
 jobs:
-  fetch:
+  process:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -25,14 +26,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests openpyxl playwright cloakbrowser
-
-      - name: Install Playwright browsers
-        run: playwright install chromium --with-deps
-
-      - name: Run fetch script
-        if: github.event.inputs.full_sync != 'false'
-        run: python3 scripts/pudong_fetch.py
+        run: pip install requests openpyxl
 
       - name: Run process script
         if: github.event.inputs.full_sync != 'false'
@@ -52,6 +46,6 @@ jobs:
         with:
           name: pudong-policies-${{ github.run_number }}
           path: |
-            /tmp/pudong_policies_full.json
+            data/pudong_policies.json
             /tmp/pudong_policies_full.xlsx
           retention-days: 7

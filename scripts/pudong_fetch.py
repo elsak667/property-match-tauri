@@ -86,9 +86,9 @@ async def fetch_list(browser):
 
     page.on("response", on_response)
 
-    await page.goto(build_url(1), timeout=30000)
+    await page.goto("https://pyd.pudong.gov.cn/website/pud/policyretrieval", timeout=30000)
     await page.wait_for_load_state("networkidle")
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
 
     # 等待第1页
     for _ in range(40):
