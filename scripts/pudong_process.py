@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
 浦易达政策整理脚本 - JSON → Excel
-读取抓取输出的 JSON，生成精简 Excel
+读取抓取输出的 JSON，生成精简 Excel（15字段）
 
-飞书表头映射：
-  id, policyName, r2212SpecialCategoryName, policyObject, policyCondition,
-  policyContent, claimMethod, amount, paymentStandard, leadDepartment,
-  contactInfo, start, end, zcReleaseTime
+字段：
+  id, policyName, r2212SpecialCategoryName,
+  policyObject, policyCondition, policyContent,
+  claimMethod, maxPaymentAmount, paymentStandard,
+  leadDepartment, contactInfo,
+  declarStartTime, declarEndTime,
+  zcReleaseTime
 
 用法：
-  python pudong_process.py
-  python pudong_process.py -i /path/to/input.json
-  python pudong_process.py -o /path/to/output.xlsx
+  python pudong_process.py                          # 默认处理 /tmp/pudong_policies_full.json
+  python pudong_process.py -i /path/to/input.json   # 指定输入
+  python pudong_process.py -o /path/to/output.xlsx  # 指定输出
 """
 import argparse
 import json
@@ -58,8 +61,7 @@ def format_datetime(val):
     return val[:10] if len(val) >= 10 else val
 
 
-# Excel 列名（飞书表头）
-EXCEL_HEADERS = [
+FIELDS = [
     "id",
     "policyName",
     "r2212SpecialCategoryName",
@@ -67,34 +69,14 @@ EXCEL_HEADERS = [
     "policyCondition",
     "policyContent",
     "claimMethod",
-    "amount",
+    "maxPaymentAmount",
     "paymentStandard",
     "leadDepartment",
     "contactInfo",
-    "applicableRegion",
-    "start",
-    "end",
+    "declarStartTime",
+    "declarEndTime",
     "zcReleaseTime",
 ]
-
-# JSON 字段到 Excel 列名的映射
-FIELD_MAP = {
-    "id": "id",
-    "policyName": "policyName",
-    "r2212SpecialCategoryName": "r2212SpecialCategoryName",
-    "policyObject": "policyObject",
-    "policyCondition": "policyCondition",
-    "policyContent": "policyContent",
-    "claimMethod": "claimMethod",
-    "fundingAmount": "amount",
-    "paymentStandard": "paymentStandard",
-    "leadDepartment": "leadDepartment",
-    "contactInfo": "contactInfo",
-    "r2509Area": "applicableRegion",
-    "declarStartTime": "start",
-    "declarEndTime": "end",
-    "zcReleaseTime": "zcReleaseTime",
-}
 
 
 def main():
@@ -107,20 +89,21 @@ def main():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Sheet"
-    ws.append(EXCEL_HEADERS)
+    ws.append(FIELDS)
 
     for i, item in enumerate(data, 1):
         row = []
-        for json_field, excel_col in FIELD_MAP.items():
-            val = item.get(json_field, "")
+        for field in FIELDS:
+            val = item.get(field, "")
 
-            # 格式化
-            if json_field in ("declarStartTime", "declarEndTime", "zcReleaseTime"):
+            # 特殊字段格式化
+            if field in ("declarStartTime", "declarEndTime", "zcReleaseTime"):
                 val = format_datetime(val)
-            elif json_field in ("policyObject", "policyCondition", "policyContent",
-                                "paymentStandard", "claimMethod", "contactInfo"):
+            elif field in ("policyObject", "policyCondition", "policyContent",
+                           "paymentStandard", "claimMethod", "contactInfo",
+                           "maxPaymentAmount"):
                 val = clean_text(val)
-            elif json_field == "leadDepartment":
+            elif field == "leadDepartment":
                 val = val or item.get("leadDeptName", "")
 
             row.append(val)
