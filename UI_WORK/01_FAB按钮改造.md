@@ -3,7 +3,7 @@
 **日期：** 2026-05-14
 **修改范围：** 首页右下角悬浮按钮（AI助手、意见反馈）
 **状态：** ✅ 完成
-** commit：** `070a402`（合并提交），`e90eafe`（文字微调），`b4173f4`（修复类名不一致）
+** commit：** `070a402`（合并提交），`e90eafe`（文字微调），`b4173f4`（类名不一致），`ed2b6d9`（CSS重构拆分）
 
 ---
 
@@ -55,11 +55,23 @@
 - 修复：将 `.fab-stack` 并入 `.ai-fab-wrap`，统一类名
 - **commit：** `b4173f4`
 
+#### 2026-05-15 — CSS 文件结构重构（宜早不宜迟）
+- 原因：index.css 达3000行，全部集中不利于多人协作和后续扩展
+- FAB 按钮样式（163行）→ `src/components/FAB.css`
+- 浮窗面板样式（219行）→ `src/components/Panel.css`
+- `AIAssistant.tsx` 和 `Feedback.tsx` 各新增 `import './FAB.css'` 和 `import './Panel.css'`
+- `check-css-classes.cjs` 更新：扫描路径加入新 CSS 文件
+- 验证：并排对比原始版本（http://localhost:5174/），功能正常
+- **commit：** `ed2b6d9`
+
 ---
 
 ### 文件变更
 | 文件 | 改动 |
 |------|------|
-| `src/index.css` | 全部 FAB 样式从 inline 迁移至 CSS，新增 Syne 字体引入 |
-| `src/components/AIAssistant.tsx` | HTML 结构：新增 `ai-fab-wrap`、`ai-fab-label` |
-| `src/components/Feedback.tsx` | 同上 |
+| `src/index.css` | 删除 FAB + 面板样式（-384行），剩余2678行 |
+| `src/components/FAB.css` | 新增164行，浮窗按钮专属样式 |
+| `src/components/Panel.css` | 新增220行，浮窗面板共享样式 |
+| `src/components/AIAssistant.tsx` | 新增 import FAB.css + Panel.css |
+| `src/components/Feedback.tsx` | 新增 import FAB.css + Panel.css |
+| `scripts/check-css-classes.cjs` | 新增 FAB.css 和 Panel.css 到扫描路径 |
