@@ -6,6 +6,8 @@ import { openPrintHtmlRaw } from "../lib/pdfgen_new";
 import BuildingDetailPanel from "./BuildingDetailPanel";
 import { Icon } from "./Icons";
 import { trackEvent, trackExport, trackClick } from "../lib/track";
+import "./FAB.css";
+import "./Panel.css";
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 interface AiPolicyMatch {

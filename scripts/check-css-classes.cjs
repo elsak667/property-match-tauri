@@ -14,6 +14,8 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 const COMPONENT_EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js'];
 const CSS_FILES = [
   path.join(PROJECT_ROOT, 'src/index.css'),
+  path.join(PROJECT_ROOT, 'src/components/FAB.css'),
+  path.join(PROJECT_ROOT, 'src/components/Panel.css'),
 ];
 
 // ─── 工具函数 ────────────────────────────────────────────

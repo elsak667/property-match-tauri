@@ -1,0 +1,163 @@
+/* ─── 浮窗助手按钮 ─── */
+.ai-fab-wrap {
+  position: fixed;
+  right: 24px;
+  bottom: 80px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.ai-fab {
+  position: relative;
+  border: none;
+  cursor: pointer;
+  width: 120px;
+  height: 36px;
+  border-radius: 18px;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 24px;
+}
+.ai-fab:hover { transform: scale(1.05) translateY(-2px); }
+.ai-fab-icon,
+.ai-fab-icon svg { color: rgba(255, 255, 255, 0.5) !important; font-size: 18px; pointer-events: none; position: absolute; left: 8px; top: 5px; }
+.ai-fab-label {
+  position: absolute;
+  top: calc(50% - 1px);
+  right: 16px;
+  transform: translateY(-50%);
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.6);
+  user-select: none;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* AI 助手 — 蓝紫渐变 */
+.ai-fab.ai-fab-ai {
+  background: linear-gradient(135deg, var(--accent) 0%, #7c5cbf 100%);
+  box-shadow: 0 4px 20px rgba(59, 109, 181, 0.45), 0 0 0 0 rgba(59,109,181,0);
+}
+.ai-fab.ai-fab-ai:hover {
+  box-shadow: 0 8px 32px rgba(59, 109, 181, 0.5), 0 0 0 4px rgba(59,109,181,0.15);
+}
+.ai-fab-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  background: #e74c3c;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+/* 反馈 — 字段样式 */
+.feedback-type-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+.feedback-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+.feedback-required { color: #ef4444; }
+.feedback-type-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.feedback-type-btn {
+  padding: 4px 12px;
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 20px;
+  background: rgba(245, 158, 11, 0.05);
+  color: #92400e;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.feedback-type-btn:hover { border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.feedback-type-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  border-color: transparent;
+  color: var(--text-1);
+  font-weight: 600;
+}
+.feedback-image-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.feedback-image-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid rgba(245,158,11,0.3);
+  flex-shrink: 0;
+}
+.feedback-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.feedback-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: var(--text-1);
+  border: none;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feedback-image-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border: 1.5px dashed rgba(245,158,11,0.4);
+  border-radius: 8px;
+  font-size: 11px;
+  color: #92400e;
+  cursor: pointer;
+  background: rgba(245,158,11,0.05);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.feedback-image-upload:hover { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
+.feedback-image-upload.disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 反馈 — 橙色渐变 */
+.ai-fab.ai-fab-feedback {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+}
+.ai-fab.ai-fab-feedback:hover {
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.5), 0 0 0 4px rgba(245,158,11,0.15);
+}
