@@ -104,7 +104,6 @@ const NAV_ITEMS = [
   { key: "property" as const, label: "物业载体", IconComp: Icon.property },
   { key: "placeholder-invest" as const, label: "招商管理", IconComp: Icon.chart },
   { key: "placeholder-industry" as const, label: "产业图谱", IconComp: Icon.industry },
-  { key: "clue" as const, label: "招商线索", IconComp: Icon.chart },
 ] as const;
 
 interface NavBarProps {
