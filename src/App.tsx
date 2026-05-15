@@ -3,13 +3,14 @@ import PolicyPage from "./app/policy/PolicyPage";
 import CarrierPage from "./app/carrier/CarrierPage";
 import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
+import ClueFormPage from "./app/clue/ClueFormPage";
 import Feedback from "./components/Feedback";
 import AIAssistant from "./components/AIAssistant";
 import { Icon } from "./components/Icons";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
 
-type Page = "home" | "policy" | "property" | "placeholder-invest" | "placeholder-industry";
+type Page = "home" | "policy" | "property" | "placeholder-invest" | "placeholder-industry" | "clue";
 
 interface AiPropertyMatch {
   id: number;
@@ -38,7 +39,7 @@ export default function App() {
 
   useEffect(() => {
     (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
-      if (["home", "policy", "property", "placeholder-invest", "placeholder-industry"].includes(page)) {
+      if (["home", "policy", "property", "placeholder-invest", "placeholder-industry", "clue"].includes(page)) {
         setCurrentPage(page as Page);
       }
     };
@@ -76,6 +77,7 @@ export default function App() {
               features={["产业赛道分析", "重点行业分布", "产业集群可视化", "招商热力图", "行业趋势监测"]}
             />
           )}
+          {currentPage === "clue" && <ClueFormPage />}
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
@@ -102,6 +104,7 @@ const NAV_ITEMS = [
   { key: "property" as const, label: "物业载体", IconComp: Icon.property },
   { key: "placeholder-invest" as const, label: "招商管理", IconComp: Icon.chart },
   { key: "placeholder-industry" as const, label: "产业图谱", IconComp: Icon.industry },
+  { key: "clue" as const, label: "招商线索", IconComp: Icon.chart },
 ] as const;
 
 interface NavBarProps {
