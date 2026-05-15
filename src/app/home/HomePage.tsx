@@ -121,6 +121,21 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
         </div>
       </div>
 
+      {/* ── 招商线索入口 CTA ── */}
+      <div
+        className="home-clue-cta"
+        onClick={() => window.__setPage__?.("clue")}
+      >
+        <div className="clue-cta-icon"><Icon.sparklesAccent /></div>
+        <div className="clue-cta-content">
+          <div className="clue-cta-title">提交招商线索</div>
+          <div className="clue-cta-sub">快速提报潜在客户信息，AI 自动分析匹配度</div>
+        </div>
+        <button className="clue-cta-btn">
+          立即提交 <Icon.arrowRightAccent />
+        </button>
+      </div>
+
       {/* ── 主体：左侧快讯 + 右侧模块 ── */}
       <div className="home-body">
         {/* 移动端横向跑马灯（桌面端隐藏） */}

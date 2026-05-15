@@ -1041,6 +1041,48 @@ input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accen
 }
 .news-ticker-title { font-size: 12px; color: var(--text-2); font-weight: 500; }
 
+/* ─── Clue CTA Banner ─── */
+.home-clue-cta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, var(--primary), #2d6a4f);
+  border-radius: var(--radius);
+  padding: 18px 24px;
+  cursor: pointer;
+  transition: all .25s ease;
+  box-shadow: 0 4px 20px rgba(45,106,79,.25);
+  margin-bottom: 14px;
+}
+.home-clue-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(45,106,79,.35);
+}
+.clue-cta-icon {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.clue-cta-icon svg { width: 24px; height: 24px; }
+.clue-cta-content { flex: 1; }
+.clue-cta-title {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 700;
+  color: #fff; margin-bottom: 4px;
+}
+.clue-cta-sub { font-size: 12px; color: rgba(255,255,255,.75); }
+.clue-cta-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; color: var(--primary);
+  font-size: 12px; font-weight: 700;
+  padding: 8px 18px; border-radius: 8px; border: none;
+  cursor: pointer; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.clue-cta-btn:hover { transform: translateY(-1px); }
+
 /* ─── Right Modules Stack ─── */
 .home-right-modules { display: flex; flex-direction: column; gap: 14px; height: 100%; }
 .home-main-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; height: calc(50% - 7px); overflow: hidden; }
