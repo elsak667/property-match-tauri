@@ -1573,7 +1573,7 @@ a { transition: color .15s ease; }
    Mobile Responsive — 768px and below
    ══════════════════════════════════════════ */
 /* ─── 浮窗助手按钮 ─── */
-.fab-stack {
+.ai-fab-wrap {
   position: fixed;
   right: 24px;
   bottom: 80px;
@@ -1582,11 +1582,6 @@ a { transition: color .15s ease; }
   flex-direction: column;
   align-items: center;
   gap: 9px;
-}
-
-.ai-fab-wrap {
-  display: flex;
-  align-items: center;
 }
 
 .ai-fab {
@@ -2109,7 +2104,7 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   .footer-credit { font-size: 10px !important; }
 
   /* ─── 浮窗助手 移动端 ─── */
-  .fab-stack { right: 16px; bottom: 85px; }
+  .ai-fab-wrap { right: 16px; bottom: 85px; }
   .ai-fab { width: 100px; height: 32px; padding: 0 10px; }
   .ai-fab-label { font-size: 12px; }
   .ai-fab-icon { font-size: 16px; }
