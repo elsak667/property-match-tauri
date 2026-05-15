@@ -214,15 +214,17 @@ async def main():
         tasks = [fetch_detail(browser, item, semaphore) for item in all_items]
 
         done_count = 0
+        results = []
         for i, coro in enumerate(asyncio.as_completed(tasks), 1):
             result = await coro
             done_count += 1
+            results.append(result)
             print(f"  [{done_count}/{len(all_items)}] {result.get('name', '?')[:40]}")
 
     # 保存
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
-        json.dumps(all_items, ensure_ascii=False, indent=2),
+        json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
     print(f"已保存到 {args.output}")
