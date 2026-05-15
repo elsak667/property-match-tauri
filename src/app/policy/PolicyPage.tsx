@@ -111,6 +111,49 @@ function PolicyCard({
               <div className="detail-item"><span className="detail-label">兑现方式</span><span className="detail-value">{item.method || "—"}</span></div>
             </div>
           </div>
+          {item._精准匹配 && (
+            <div className="detail-section">
+              <div className="detail-title">企业精准匹配</div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: item._精准匹配.matched ? "#059669" : "#dc2626",
+                  color: "#fff"
+                }}>
+                  {item._精准匹配.matched ? "✓ 满足条件" : "✗ 不满足条件"}
+                </span>
+              </div>
+              {item._精准匹配.matchedConditions && item._精准匹配.matchedConditions.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: "#059669", fontWeight: 600, marginBottom: 4 }}>已满足条件</div>
+                  {item._精准匹配.matchedConditions.map((cond: string, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: "#059669", paddingLeft: 8, marginBottom: 2 }}>
+                      ✓ {cond}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {item._精准匹配.unmatchedConditions && item._精准匹配.unmatchedConditions.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600, marginBottom: 4 }}>未满足条件</div>
+                  {item._精准匹配.unmatchedConditions.map((cond: string, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: "#dc2626", paddingLeft: 8, marginBottom: 2 }}>
+                      ✗ {cond}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {item._精准匹配.overallReason && (
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 8, fontStyle: "italic" }}>
+                  匹配说明: {item._精准匹配.overallReason}
+                </div>
+              )}
+            </div>
+          )}
           {item.policyObject && (
             <div className="detail-section">
               <div className="detail-title">政策对象</div>
@@ -336,6 +379,26 @@ export default function PolicyPage() {
               共 {policies.length} 条政策
               {fromFeishu && <span style={{ color: "#059669" }}> · 飞书数据</span>}
             </div>
+          </div>
+
+          <div className="filter-section">
+            <div className="filter-label"><Icon.building /> 企业精准匹配</div>
+            <input
+              id="company-input-sidebar"
+              type="text"
+              aria-label="企业名称"
+              placeholder="输入企业名称进行精准匹配"
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+              maxLength={50}
+              className="search-input"
+              style={{ marginBottom: 6 }}
+            />
+            {companyName.trim() && (
+              <div style={{ fontSize: 11, color: "#059669" }}>
+                匹配企业: <strong>{companyName}</strong>
+              </div>
+            )}
           </div>
 
           {options.locations.length > 0 && (

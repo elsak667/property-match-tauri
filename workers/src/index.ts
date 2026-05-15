@@ -18,6 +18,8 @@ interface Env {
   AI_ACCOUNT_ID: string;
   CLUE_SHEET: string;
   CLUE_SHEET_ID: string;
+  CUSTOMER_SHEET: string;
+  CUSTOMER_SHEET_ID: string;
 }
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
@@ -288,6 +290,18 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return handleAiQuery(q, env);
     }
 
+    // /api/enterprise/search?name=企业名称
+    if (path === "/api/enterprise/search" && request.method === "GET") {
+      const name = url.searchParams.get("name") || "";
+      // TODO: 替换为天眼查 API，目前返回空（Mock 阶段）
+      return json({ list: [], total: 0, mock: true });
+    }
+
+    // /api/policy/match-precise（待实现）
+    if (path === "/api/policy/match-precise" && request.method === "POST") {
+      return json({ error: "Not yet implemented" }, 501);
+    }
+
     // /api/properties?type=园区|楼宇|单元|产业字典
     if (path === "/api/properties" && request.method === "GET") {
       const type = url.searchParams.get("type") || "单元";
@@ -351,6 +365,40 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
         if (request.method === "DELETE") {
           // 删除线索
           await bitableDeleteRecord(env, clueAppToken, clueTableId, recordId);
+          return json({ success: true });
+        }
+      }
+    }
+
+    // ===== 客户管理 API (Bitable) =====
+    const customerAppToken = env.CUSTOMER_SHEET;
+    const customerTableId = env.CUSTOMER_SHEET_ID;
+    if (!customerAppToken || !customerTableId) {
+      // Don't block other APIs if customer not configured
+    } else if (path === "/api/invest-api/customers" && request.method === "GET") {
+      const result = await bitableGetRecords(env, customerAppToken, customerTableId, 100);
+      return json({ data: result.items, hasMore: result.hasMore, pageToken: result.pageToken });
+    } else if (path === "/api/invest-api/customers" && request.method === "POST") {
+      const body = await request.json() as Record<string, unknown>;
+      const { record_id, fields } = await bitableCreateRecord(env, customerAppToken, customerTableId, body as Record<string, unknown>);
+      return json({ record_id, fields }, 201);
+    } else {
+      const customerIdMatch = path.match(/^\/api\/invest-api\/customers\/([^/]+)$/);
+      if (customerIdMatch && customerAppToken && customerTableId) {
+        const recordId = customerIdMatch[1];
+        if (request.method === "GET") {
+          const result = await bitableGetRecords(env, customerAppToken, customerTableId, 500);
+          const item = result.items.find((r: Record<string, unknown>) => String(r.record_id) === recordId);
+          if (!item) return json({ error: "Customer not found" }, 404);
+          return json(item);
+        }
+        if (request.method === "PUT") {
+          const body = await request.json() as Record<string, unknown>;
+          await bitableUpdateRecord(env, customerAppToken, customerTableId, recordId, body as Record<string, unknown>);
+          return json({ success: true });
+        }
+        if (request.method === "DELETE") {
+          await bitableDeleteRecord(env, customerAppToken, customerTableId, recordId);
           return json({ success: true });
         }
       }
