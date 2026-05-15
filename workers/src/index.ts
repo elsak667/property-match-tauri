@@ -16,6 +16,8 @@ interface Env {
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
   AI_ACCOUNT_ID: string;
+  CLUE_SHEET: string;
+  CLUE_SHEET_ID: string;
 }
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
@@ -226,6 +228,70 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
           return obj;
         });
       return json(items);
+    }
+
+    // ===== 线索管理 API =====
+    // 匹配 /api/invest-api/clues 前缀
+    if (path.startsWith("/api/invest-api/clues")) {
+      const clueSheetId = env.CLUE_SHEET_ID;
+      if (!clueSheetId) {
+        return json({ error: "CLUE_SHEET_ID not configured" }, 500);
+      }
+
+      // GET /api/invest-api/clues — 获取线索列表
+      if (path === "/api/invest-api/clues" && request.method === "GET") {
+        const data = await fetchSheet(env, env.CLUE_SHEET, clueSheetId, "A1:ZZ500");
+        if (!data || data.length < 2) return json({ headers: [], data: [] });
+        const headers: string[] = (data[0] as unknown[]).map((v) => String(v ?? ""));
+        const items = data.slice(1)
+          .filter((row) => Array.isArray(row) && row.length > 0 && row[0] != null)
+          .map((row) => {
+            const obj: Record<string, unknown> = {};
+            headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? null; });
+            return obj;
+          });
+        return json({ headers, data: items });
+      }
+
+      // POST /api/invest-api/clues — 提交新线索
+      if (path === "/api/invest-api/clues" && request.method === "POST") {
+        const body = await request.json() as Record<string, unknown>;
+        // TODO: 实现写入逻辑（需配置实际的 CLUE_SHEET_ID）
+        return json({ error: "Not yet implemented: POST /api/invest-api/clues — needs CLUE_SHEET_ID" }, 501);
+      }
+
+      // GET /api/invest-api/clues/:id — 获取线索详情
+      const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);
+      if (clueIdMatch && request.method === "GET") {
+        const clueId = clueIdMatch[1];
+        const data = await fetchSheet(env, env.CLUE_SHEET, clueSheetId, "A1:ZZ500");
+        if (!data || data.length < 2) return json({ error: "Clue not found" }, 404);
+        const headers: string[] = (data[0] as unknown[]).map((v) => String(v ?? ""));
+        const item = data.slice(1)
+          .filter((row) => Array.isArray(row) && row.length > 0 && row[0] != null)
+          .find((row) => String(row[0]) === clueId);
+        if (!item) return json({ error: "Clue not found" }, 404);
+        const obj: Record<string, unknown> = {};
+        headers.forEach((h, i) => { obj[h] = (item as unknown[])[i] ?? null; });
+        return json(obj);
+      }
+
+      // PUT /api/invest-api/clues/:id — 更新线索状态
+      const clueUpdateMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);
+      if (clueUpdateMatch && request.method === "PUT") {
+        const clueId = clueUpdateMatch[1];
+        const body = await request.json() as Record<string, unknown>;
+        // TODO: 实现更新逻辑（需配置实际的 CLUE_SHEET_ID）
+        return json({ error: "Not yet implemented: PUT /api/invest-api/clues/:id — needs CLUE_SHEET_ID" }, 501);
+      }
+
+      // POST /api/invest-api/clues/:id/convert — 线索转为客户（扩展预留）
+      const clueConvertMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/);
+      if (clueConvertMatch && request.method === "POST") {
+        const clueId = clueConvertMatch[1];
+        // TODO: 实现转化逻辑
+        return json({ error: "Not yet implemented: POST /api/invest-api/clues/:id/convert — reserved for future" }, 501);
+      }
     }
 
     return json({ error: "Not found" }, 404);
