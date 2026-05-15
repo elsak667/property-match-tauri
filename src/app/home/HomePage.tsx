@@ -126,6 +126,9 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
             <Icon.sparklesAccent /> 提交线索
           </button>
         </div>
+      </div>
+
+      {/* ── 主体：左侧快讯 + 右侧模块 ── */}
       <div className="home-body">
         {/* 移动端横向跑马灯（桌面端隐藏） */}
         <div className="home-news-ticker-mobile">
