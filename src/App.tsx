@@ -79,19 +79,21 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-      <AIAssistant
-        aiActiveBuildingId={aiActiveBuildingId}
-        onAiResultChange={setAiResult}
-        onAiBuildingClick={(buildingId: string) => {
-          if (buildingId === "") {
-            setAiActiveBuildingId(null);
-          } else {
-            setAiActiveBuildingId(buildingId);
-            if (currentPage !== "property") setCurrentPage("property");
-          }
-        }}
-      />
-      <Feedback />
+      <div className="ai-fab-wrap">
+        <Feedback />
+        <AIAssistant
+          aiActiveBuildingId={aiActiveBuildingId}
+          onAiResultChange={setAiResult}
+          onAiBuildingClick={(buildingId: string) => {
+            if (buildingId === "") {
+              setAiActiveBuildingId(null);
+            } else {
+              setAiActiveBuildingId(buildingId);
+              if (currentPage !== "property") setCurrentPage("property");
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
