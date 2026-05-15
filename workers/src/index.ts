@@ -22,6 +22,7 @@ interface Env {
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
 const SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
+const BITABLE_URL = "https://open.feishu.cn/open-apis/bitable/v1/apps";
 
 const CACHE: Map<string, { token: string; expires: number }> = new Map();
 
@@ -60,6 +61,87 @@ async function fetchSheet(
   };
   if (data.code !== 0) throw new Error(`Sheet error ${data.code}: ${data.msg}`);
   return data.data?.valueRange?.values ?? [];
+}
+
+// Bitable API helpers
+async function bitableGetRecords(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  pageSize = 100,
+  pageToken?: string,
+): Promise<{ items: Record<string, unknown>[]; hasMore: boolean; pageToken?: string }> {
+  const token = await getToken(env);
+  let url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records?page_size=${pageSize}`;
+  if (pageToken) url += `&page_token=${pageToken}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  const data = await res.json() as {
+    code: number; msg?: string;
+    data?: { items?: Record<string, unknown>[]; has_more?: boolean; page_token?: string };
+  };
+  if (data.code !== 0) throw new Error(`Bitable get error ${data.code}: ${data.msg}`);
+  return {
+    items: data.data?.items ?? [],
+    hasMore: data.data?.has_more ?? false,
+    pageToken: data.data?.page_token,
+  };
+}
+
+async function bitableCreateRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  fields: Record<string, unknown>,
+): Promise<{ record_id: string; fields: Record<string, unknown> }> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json() as {
+    code: number; msg?: string;
+    data?: { record?: { record_id: string; fields: Record<string, unknown> } };
+  };
+  if (data.code !== 0) throw new Error(`Bitable create error ${data.code}: ${data.msg}`);
+  return { record_id: data.data?.record?.record_id ?? "", fields: data.data?.record?.fields ?? {} };
+}
+
+async function bitableUpdateRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  recordId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records/${recordId}`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json() as { code: number; msg?: string };
+  if (data.code !== 0) throw new Error(`Bitable update error ${data.code}: ${data.msg}`);
+}
+
+async function bitableDeleteRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  recordId: string,
+): Promise<void> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records/${recordId}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  const data = await res.json() as { code: number; msg?: string };
+  if (data.code !== 0) throw new Error(`Bitable delete error ${data.code}: ${data.msg}`);
 }
 
 function json(body: unknown, status = 200): Response {
@@ -230,67 +312,47 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return json(items);
     }
 
-    // ===== 线索管理 API =====
-    // 匹配 /api/invest-api/clues 前缀
-    if (path.startsWith("/api/invest-api/clues")) {
-      const clueSheetId = env.CLUE_SHEET_ID;
-      if (!clueSheetId) {
-        return json({ error: "CLUE_SHEET_ID not configured" }, 500);
-      }
-
-      // GET /api/invest-api/clues — 获取线索列表
-      if (path === "/api/invest-api/clues" && request.method === "GET") {
-        const data = await fetchSheet(env, env.CLUE_SHEET, clueSheetId, "A1:ZZ500");
-        if (!data || data.length < 2) return json({ headers: [], data: [] });
-        const headers: string[] = (data[0] as unknown[]).map((v) => String(v ?? ""));
-        const items = data.slice(1)
-          .filter((row) => Array.isArray(row) && row.length > 0 && row[0] != null)
-          .map((row) => {
-            const obj: Record<string, unknown> = {};
-            headers.forEach((h, i) => { obj[h] = (row as unknown[])[i] ?? null; });
-            return obj;
-          });
-        return json({ headers, data: items });
-      }
-
-      // POST /api/invest-api/clues — 提交新线索
-      if (path === "/api/invest-api/clues" && request.method === "POST") {
-        const body = await request.json() as Record<string, unknown>;
-        // TODO: 实现写入逻辑（需配置实际的 CLUE_SHEET_ID）
-        return json({ error: "Not yet implemented: POST /api/invest-api/clues — needs CLUE_SHEET_ID" }, 501);
-      }
-
-      // GET /api/invest-api/clues/:id — 获取线索详情
+    // ===== 线索管理 API (Bitable) =====
+    // CLUE_SHEET = app_token, CLUE_SHEET_ID = table_id
+    const clueAppToken = env.CLUE_SHEET;
+    const clueTableId = env.CLUE_SHEET_ID;
+    if (!clueAppToken || !clueTableId) {
+      // Don't block other APIs if clue not configured
+    } else if (path === "/api/invest-api/clues" && request.method === "GET") {
+      // 获取线索列表
+      const result = await bitableGetRecords(env, clueAppToken, clueTableId, 100);
+      return json({ data: result.items, hasMore: result.hasMore, pageToken: result.pageToken });
+    } else if (path === "/api/invest-api/clues" && request.method === "POST") {
+      // 提交新线索
+      const body = await request.json() as Record<string, unknown>;
+      const { record_id, fields } = await bitableCreateRecord(env, clueAppToken, clueTableId, body as Record<string, unknown>);
+      return json({ record_id, fields }, 201);
+    } else if (path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/)) {
+      // 线索转客户（预留）
+      return json({ error: "Not yet implemented: clue conversion" }, 501);
+    } else {
+      // GET/PUT /api/invest-api/clues/:id
       const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);
-      if (clueIdMatch && request.method === "GET") {
-        const clueId = clueIdMatch[1];
-        const data = await fetchSheet(env, env.CLUE_SHEET, clueSheetId, "A1:ZZ500");
-        if (!data || data.length < 2) return json({ error: "Clue not found" }, 404);
-        const headers: string[] = (data[0] as unknown[]).map((v) => String(v ?? ""));
-        const item = data.slice(1)
-          .filter((row) => Array.isArray(row) && row.length > 0 && row[0] != null)
-          .find((row) => String(row[0]) === clueId);
-        if (!item) return json({ error: "Clue not found" }, 404);
-        const obj: Record<string, unknown> = {};
-        headers.forEach((h, i) => { obj[h] = (item as unknown[])[i] ?? null; });
-        return json(obj);
-      }
-
-      // PUT /api/invest-api/clues/:id — 更新线索状态
-      const clueUpdateMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);
-      if (clueUpdateMatch && request.method === "PUT") {
-        const clueId = clueUpdateMatch[1];
-        const body = await request.json() as Record<string, unknown>;
-        // TODO: 实现更新逻辑（需配置实际的 CLUE_SHEET_ID）
-        return json({ error: "Not yet implemented: PUT /api/invest-api/clues/:id — needs CLUE_SHEET_ID" }, 501);
-      }
-
-      // POST /api/invest-api/clues/:id/convert — 线索转为客户（扩展预留）
-      const clueConvertMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/);
-      if (clueConvertMatch && request.method === "POST") {
-        const clueId = clueConvertMatch[1];
-        // TODO: 实现转化逻辑
-        return json({ error: "Not yet implemented: POST /api/invest-api/clues/:id/convert — reserved for future" }, 501);
+      if (clueIdMatch && clueAppToken && clueTableId) {
+        const recordId = clueIdMatch[1];
+        if (request.method === "GET") {
+          // 获取线索详情 — 先拉列表找到 record
+          const result = await bitableGetRecords(env, clueAppToken, clueTableId, 500);
+          const item = result.items.find((r: Record<string, unknown>) => String(r.record_id) === recordId);
+          if (!item) return json({ error: "Clue not found" }, 404);
+          return json(item);
+        }
+        if (request.method === "PUT") {
+          // 更新线索
+          const body = await request.json() as Record<string, unknown>;
+          await bitableUpdateRecord(env, clueAppToken, clueTableId, recordId, body as Record<string, unknown>);
+          return json({ success: true });
+        }
+        if (request.method === "DELETE") {
+          // 删除线索
+          await bitableDeleteRecord(env, clueAppToken, clueTableId, recordId);
+          return json({ success: true });
+        }
       }
     }
 
@@ -306,7 +368,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
       });
