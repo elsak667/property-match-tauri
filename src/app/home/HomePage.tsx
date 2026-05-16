@@ -118,13 +118,6 @@ export default function HomePage({ policyCount, carrierCount, news }: Props) {
           <span className="hero-stat"><strong>{policyCount || 0}</strong> 政策</span>
           <span className="hero-stat-sep">·</span>
           <span className="hero-stat"><strong>{carrierCount || 0}</strong> 载体</span>
-          <span className="hero-stat-sep">·</span>
-          <button
-            className="hero-clue-btn"
-            onClick={() => window.__setPage__?.("clue")}
-          >
-            <Icon.sparklesAccent /> 提交线索
-          </button>
         </div>
       </div>
 
