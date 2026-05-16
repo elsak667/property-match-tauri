@@ -7,6 +7,8 @@ import AIAssistant from "./AIAssistant";
 import Feedback from "./Feedback";
 import ClueFormPage from "../app/clue/ClueFormPage";
 import { Icon } from "./Icons";
+import "./Launcher.css";
+import "./Panel.css";
 import { trackEvent } from "../lib/track";
 
 type ActivePanel = "ai" | "clue" | "feedback" | null;
@@ -70,7 +72,7 @@ export default function Launcher() {
       >
         <button className="launcher-main" aria-label="打开工具台">
           <span className="launcher-main-icon">
-            {hoverOpen ? <Icon.close /> : <Icon.zapAccent />}
+            {hoverOpen ? <Icon.close /> : <Icon.message />}
           </span>
         </button>
 
@@ -92,11 +94,18 @@ export default function Launcher() {
 
       {activePanel === "ai" && (
         <div className="launcher-panel-overlay" onClick={handleClose}>
-          <div className="launcher-panel" onClick={e => e.stopPropagation()}>
+          <div className="launcher-panel launcher-panel-ai" onClick={e => e.stopPropagation()}>
+            <div className="launcher-panel-header ai">
+              <span><Icon.sparklesAccent /></span>
+              <span className="launcher-panel-title">AI 智能匹配</span>
+              <button className="ai-panel-close" onClick={handleClose}><Icon.closeSm /></button>
+            </div>
             <AIAssistant
               aiActiveBuildingId={null}
               onAiResultChange={handleAiResultChange}
               onAiBuildingClick={handleAiBuildingClick}
+              autoOpen
+              inLauncher
             />
           </div>
         </div>
@@ -105,8 +114,8 @@ export default function Launcher() {
       {activePanel === "clue" && (
         <div className="launcher-panel-overlay" onClick={handleClose}>
           <div className="launcher-panel launcher-panel-clue" onClick={e => e.stopPropagation()}>
-            <div className="launcher-panel-header">
-              <span>💡</span>
+            <div className="launcher-panel-header clue">
+              <span><Icon.lightbulb /></span>
               <span className="launcher-panel-title">提交线索</span>
               <button className="ai-panel-close" onClick={handleClose}><Icon.closeSm /></button>
             </div>
@@ -115,7 +124,18 @@ export default function Launcher() {
         </div>
       )}
 
-      {activePanel === "feedback" && <Feedback />}
+      {activePanel === "feedback" && (
+        <div className="launcher-panel-overlay" onClick={handleClose}>
+          <div className="launcher-panel launcher-panel-feedback" onClick={e => e.stopPropagation()}>
+            <div className="launcher-panel-header feedback">
+              <span><Icon.messageAccent /></span>
+              <span className="launcher-panel-title">意见反馈</span>
+              <button className="ai-panel-close" onClick={handleClose}><Icon.closeSm /></button>
+            </div>
+            <Feedback autoOpen inLauncher />
+          </div>
+        </div>
+      )}
     </>
   );
 }

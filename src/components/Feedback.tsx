@@ -18,8 +18,14 @@ async function submitFeedback(data: { type: string; content: string; contact: st
 
 const TYPES = ["建议", "优化", "新需求", "BUG"];
 
-export default function Feedback() {
-  const [open, setOpen] = useState(false);
+interface Props {
+  standalone?: boolean;
+  autoOpen?: boolean;
+  inLauncher?: boolean;
+}
+
+export default function Feedback({ standalone, autoOpen, inLauncher }: Props) {
+  const [open, setOpen] = useState(autoOpen ?? false);
   const [content, setContent] = useState("");
   const [contact, setContact] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,20 +82,24 @@ export default function Feedback() {
 
   return (
     <>
-      <div className="ai-fab-wrap">
-        <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
-          <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.messageAccent />}</span>
-          <span className="ai-fab-label">意见反馈</span>
-        </button>
-      </div>
+      {(standalone === true) && (
+        <div className="ai-fab-wrap">
+          <button className="ai-fab ai-fab-feedback" onClick={() => setOpen(!open)} aria-label="意见反馈">
+            <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.messageAccent />}</span>
+            <span className="ai-fab-label">意见反馈</span>
+          </button>
+        </div>
+      )}
 
       {open && (
-        <div className="ai-panel ai-panel-feedback" ref={panelRef}>
-          <div className="ai-panel-header">
-            <span>💬</span>
-            <span className="ai-panel-title">意见反馈</span>
-            <button className="ai-panel-close" onClick={() => setOpen(false)}><Icon.closeSm /></button>
-          </div>
+        <div className={`ai-panel ai-panel-feedback${inLauncher ? " ai-panel-inlauncher" : ""}`} ref={panelRef}>
+          {!inLauncher && (
+            <div className="ai-panel-header">
+              <span>💬</span>
+              <span className="ai-panel-title">意见反馈</span>
+              <button className="ai-panel-close" onClick={() => setOpen(false)}><Icon.closeSm /></button>
+            </div>
+          )}
 
           {success ? (
             <div className="ai-panel-body" style={{ textAlign: "center", padding: "24px" }}>

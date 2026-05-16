@@ -148,9 +148,12 @@ interface Props {
   aiActiveBuildingId?: string | null;
   onAiResultChange?: (result: AiSearchResult | null) => void;
   onAiBuildingClick?: (buildingId: string) => void;
+  standalone?: boolean;
+  autoOpen?: boolean;
+  inLauncher?: boolean;
 }
 
-export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAiBuildingClick }: Props) {
+export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAiBuildingClick, standalone, autoOpen, inLauncher }: Props) {
   const [state, setState] = useState<AiState>("greeting");
   const [baseQuery, setBaseQuery] = useState("");           // 原始需求
   const [prefs, setPrefs] = useState<Prefs>({});            // 收集的偏好
@@ -164,7 +167,7 @@ export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAi
   const [rating, setRating] = useState<"up" | "down" | null>(null);
   const [ratingReason, setRatingReason] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen ?? false);
   const activeBuildingId = aiActiveBuildingId ?? null;
   const sessionId = getSessionId();
 
@@ -342,23 +345,26 @@ ${propTable}
 
   return (
     <>
-      {/* 浮窗气泡按钮 */}
-      <div className="ai-fab-wrap">
-        <button className="ai-fab ai-fab-ai" onClick={() => setOpen(!open)} aria-label="AI助手">
-          <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.botAccent />}</span>
-          <span className="ai-fab-label">AI助手</span>
-          {total > 0 && !open && <span className="ai-fab-dot" />}
-        </button>
-      </div>
+      {(standalone === true) && (
+        <div className="ai-fab-wrap">
+          <button className="ai-fab ai-fab-ai" onClick={() => setOpen(!open)} aria-label="AI助手">
+            <span className="ai-fab-icon">{open ? <Icon.close /> : <Icon.botAccent />}</span>
+            <span className="ai-fab-label">AI助手</span>
+            {total > 0 && !open && <span className="ai-fab-dot" />}
+          </button>
+        </div>
+      )}
 
       {/* 浮窗面板 */}
       {open && (
-        <div className="ai-panel ai-panel-ai" ref={panelRef}>
-          <div className="ai-panel-header">
-            <span><Icon.botAccent /></span>
-            <span className="ai-panel-title">AI 智能匹配</span>
-            <button className="ai-panel-close" onClick={handleClose}><Icon.closeSm /></button>
-          </div>
+        <div className={`ai-panel ai-panel-ai${inLauncher ? " ai-panel-inlauncher" : ""}`} ref={panelRef}>
+          {!inLauncher && (
+            <div className="ai-panel-header">
+              <span><Icon.botAccent /></span>
+              <span className="ai-panel-title">AI 智能匹配</span>
+              <button className="ai-panel-close" onClick={handleClose}><Icon.closeSm /></button>
+            </div>
+          )}
 
           {/* 对话历史 */}
           {history.length > 0 && (
