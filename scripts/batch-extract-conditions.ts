@@ -22,18 +22,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rgnncmgrumwjjgzyhmkt.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
-const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || 'c877368347bac6d2c962171be40048e9';
-const CF_API_TOKEN = process.env.CF_API_TOKEN || '';
-const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
+const MODEL = 'deepseek-ai/deepseek-v4-flash';
 const DRY_RUN = process.env.DRY_RUN === 'true';
+const RETRY_FAILED = process.env.RETRY_FAILED === 'true';
 
 if (!SUPABASE_SERVICE_KEY) {
   console.error('请设置环境变量: SUPABASE_SERVICE_KEY');
   process.exit(1);
 }
 
-if (!CF_API_TOKEN) {
-  console.error('请设置环境变量: CF_API_TOKEN');
+if (!NVIDIA_API_KEY) {
+  console.error('请设置环境变量: NVIDIA_API_KEY');
   process.exit(1);
 }
 
@@ -73,10 +73,10 @@ const EXTRACTION_PROMPT = `任务：从政策申报条件文本中提取结构�
 
 interface Policy {
   id: string;
-  policyName?: string;
+  policy_name?: string;
   name?: string;
   policyCondition?: string;
-  policy_Condition?: string;
+  policy_condition?: string;
 }
 
 async function callLLM(policyName: string, conditionText: string): Promise<Record<string, unknown>> {
@@ -84,34 +84,35 @@ async function callLLM(policyName: string, conditionText: string): Promise<Recor
     .replace('{policyName}', policyName || '未知政策')
     .replace('{conditionText}', conditionText || '');
 
-  const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/${MODEL}`;
+  const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CF_API_TOKEN}`
+      'Authorization': `Bearer ${NVIDIA_API_KEY}`
     },
     body: JSON.stringify({
+      model: MODEL,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 2000
+      max_tokens: 1500
     })
   });
 
   if (!response.ok) {
-    throw new Error(`LLM API error: ${response.status}`);
+    throw new Error(`NVIDIA API error: ${response.status}`);
   }
 
   const data = await response.json() as {
-    result?: { response?: string };
-    errors?: unknown[];
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
   };
 
-  if (data.errors && data.errors.length > 0) {
-    throw new Error(`LLM error: ${JSON.stringify(data.errors)}`);
+  if (data.error) {
+    throw new Error(`NVIDIA API error: ${data.error.message}`);
   }
 
-  const content = data.result?.response || '';
+  const content = data.choices?.[0]?.message?.content || '';
 
   // 提取 JSON
   const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -128,8 +129,8 @@ async function extractConditions(policy: Policy): Promise<{
   status: 'completed' | 'failed';
   error?: string;
 }> {
-  const policyName = policy.policyName || policy.name || '未知政策';
-  const conditionText = policy.policyCondition || policy.policy_Condition || '';
+  const policyName = policy.policy_name || policy.name || '未知政策';
+  const conditionText = policy.policy_condition || policy.policyCondition || '';
 
   if (!conditionText || conditionText.trim() === '') {
     return {
@@ -198,28 +199,31 @@ async function loadPolicies(): Promise<Policy[]> {
       .map(row => row.policy_id)
   );
 
-  console.log(`已有 ${alreadyExtracted.size} 条政策完成提取`);
+  const failedIds = new Set(
+    (existing || [])
+      .filter(row => row.extraction_status === 'failed')
+      .map(row => row.policy_id)
+  );
 
-  // 尝试从 Supabase policies 表加载
+  console.log(`已有 ${alreadyExtracted.size} 条政策完成提取, ${failedIds.size} 条失败`);
+
+  // 获取所有政策
   const { data: policies, error } = await supabase
     .from('policies')
-    .select('id, policyName, policyCondition');
+    .select('id, policy_name, policy_condition');
 
   if (error) {
     console.warn(`无法从 policies 表加载: ${error.message}`);
-    console.log('尝试从静态 JSON 文件加载...');
-
-    try {
-      const response = await fetch('/data/policies.json');
-      const json = await response.json() as { data?: Policy[]; data2?: Policy[] };
-      const policiesData = json.data || json.data2 || [];
-      console.log(`从 JSON 加载了 ${policiesData.length} 条政策`);
-      return policiesData.filter(p => !alreadyExtracted.has(p.id));
-    } catch (fetchError) {
-      throw new Error(`无法加载政策数据: ${fetchError}`);
-    }
+    return [];
   }
 
+  // RETRY_FAILED 模式：只处理失败的
+  if (RETRY_FAILED) {
+    console.log(`重试模式：只处理 ${failedIds.size} 条失败的政策`);
+    return (policies || []).filter(p => failedIds.has(p.id));
+  }
+
+  // 正常模式：跳过已完成的
   return (policies || []).filter(p => !alreadyExtracted.has(p.id));
 }
 
@@ -237,10 +241,10 @@ async function main() {
   let skipped = 0;
 
   for (const policy of policies) {
-    const policyName = policy.policyName || policy.name || policy.id;
+    const policyName = policy.policy_name || policy.name || policy.id;
     process.stdout.write(`[${completed + failed + skipped + 1}/${policies.length}] ${policyName.substring(0, 30)}... `);
 
-    const conditionText = policy.policyCondition || policy.policy_Condition || '';
+    const conditionText = policy.policy_condition || policy.policyCondition || '';
     if (!conditionText || conditionText.trim() === '') {
       console.log('SKIP (无申报条件)');
       skipped++;
@@ -265,8 +269,8 @@ async function main() {
       result.error
     );
 
-    // 避免 API 限流
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 避免 API 限流 (40 RPM，加安全余量到3秒)
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
 
   console.log('');

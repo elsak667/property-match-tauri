@@ -401,6 +401,19 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
           await bitableDeleteRecord(env, customerAppToken, customerTableId, recordId);
           return json({ success: true });
         }
+      } else if (path === "/api/invest-api/customers/batch" && request.method === "POST") {
+        const { customers } = await request.json() as { customers: Record<string, unknown>[] };
+        const result = { success: 0, failed: 0, errors: [] as string[] };
+        for (const customer of customers) {
+          try {
+            await bitableCreateRecord(env, customerAppToken, customerTableId, customer);
+            result.success++;
+          } catch (err: unknown) {
+            result.failed++;
+            result.errors.push(`${(customer.name || "未知")}: ${(err as Error).message}`);
+          }
+        }
+        return json(result);
       }
     }
 
