@@ -7,8 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { loadPropertyData } from "../../lib/property";
 import { filterPropertiesStatic, type BuildingSummary } from "../../lib/workers";
 import BuildingDetailPanel from "../../components/BuildingDetailPanel";
-import { Icon } from "../../components/Icons";
-import PropertyMap from "../../components/PropertyMap";
+import { Icon } from "../../components/Icons";import PropertyMap from "../../components/PropertyMap";
 import { openPrintHtmlRaw } from "../../lib/pdfgen_new";
 import { INDUSTRY_PROFILES } from "../property/mockData";
 import type { PropertyFilterResult } from "../../lib/workers";
@@ -40,7 +39,6 @@ const PARKS: { value: string; label: string }[] = [
   { value: "PARK001", label: "金桥北区" },
   { value: "PARK002", label: "金桥南区" },
 ];
-
 const IS104_OPTIONS = [
   { value: "", label: "不限" },
   { value: "是", label: "是" },
@@ -343,8 +341,7 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
 
   const handleBuildingSelect = (buildingId: string) => {
     setSelectedBuildingId(buildingId);
-    onAiBuildingClick?.(buildingId);
-  };
+    onAiBuildingClick?.(buildingId);  };
 
   function toggleCompare(bldId: string) {
     setCompareIds(prev => {
@@ -359,7 +356,6 @@ export default function CarrierPage({ aiResult, aiActiveBuildingId, onAiBuilding
     setFPark(""); setFAreaMin(""); setFAreaMax(""); setFPriceMax("");
     setFLoadMin(""); setFHeightMin(""); setFPowerKVMin(""); setFIs104("");
   }
-
   function handleIndustryCatChange(cat: string) {
     setFIndustryCat(cat);
     setFIndustry("");

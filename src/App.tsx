@@ -5,8 +5,7 @@ import HomePage from "./app/home/HomePage";
 import PlaceholderPage from "./app/placeholder/PlaceholderPage";
 import CustomerPage from "./app/invest/CustomerPage";
 import ClueFormPage from "./app/clue/ClueFormPage";
-import Feedback from "./components/Feedback";
-import AIAssistant from "./components/AIAssistant";
+import Launcher from "./components/Launcher";
 import { Icon } from "./components/Icons";
 import { usePolicies, useProperties, useNews } from "./lib/useFeishu";
 import "./index.css";
@@ -76,7 +75,7 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-      <AIAssistant
+      <Launcher
         aiActiveBuildingId={aiActiveBuildingId}
         onAiResultChange={setAiResult}
         onAiBuildingClick={(buildingId: string) => {
@@ -88,7 +87,6 @@ export default function App() {
           }
         }}
       />
-      <Feedback />
     </div>
   );
 }

@@ -250,13 +250,323 @@ export function matchPolicies(
     };
   });
 }
-// ── 过滤器构建 ──────────────────────────────────────────────────────────────
-export { buildFilterOptions } from "./policy/parser";
-// ── 产业字典加载 ─────────────────────────────────────────────────────────────
-export async function loadIndustries(): Promise<{ categories: IndustryCategory[] }> {
-  return cacheOrRefresh<{ categories: IndustryCategory[] }>("industries", async () => {
-    let rawIndustries: RawIndustry[];
-    const PROPERTY_SPREADSHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg";
+
+// ── 标签动态构建 ──────────────────────────────────────────────────────────────
+
+export interface FilterOptions {
+  industries: { k: string; l: string }[];
+  caps: { k: string; l: string }[];
+  thresholds: { k: string; l: string }[];
+  depts: { k: string; l: string; cnt: number }[];
+  cats: { k: string; l: string; cnt: number }[];
+}
+
+export async function buildFilterOptions(policies: Policy[]): Promise<FilterOptions> {
+  const industrySet = new Set<string>();
+  const capSet = new Set<string>();
+  const thresholdSet = new Set<string>();
+  const deptMap = new Map<string, number>();
+  const catMap = new Map<string, number>();
+
+  for (const p of policies) {
+    if (p.industry && !["X", "[待复核]", "[已下架]"].includes(p.industry)) {
+      for (const part of p.industry.split(/\s*\/\s*/)) {
+        const trimmed = part.trim();
+        if (trimmed && !["[待复核]"].includes(trimmed)) industrySet.add(trimmed);
+      }
+    }
+    if (p.cap && !["X", "[待复核]"].includes(p.cap)) {
+      for (const part of p.cap.split(/\s*\/\s*/)) {
+        const trimmed = part.trim();
+        if (trimmed && !["[待复核]"].includes(trimmed)) capSet.add(trimmed);
+      }
+    }
+    if (p.threshold && !["X", "无限定", "[待复核]"].includes(p.threshold)) {
+      for (const part of p.threshold.split(/\s*\/\s*/)) {
+        const trimmed = part.trim();
+        if (trimmed) thresholdSet.add(trimmed);
+      }
+    }
+    if (p.dept) {
+      deptMap.set(p.dept, (deptMap.get(p.dept) || 0) + 1);
+    }
+    if (p.specialCat) {
+      catMap.set(p.specialCat, (catMap.get(p.specialCat) || 0) + 1);
+    }
+  }
+
+  const sortedIndustries = Array.from(industrySet).sort(
+    (a, b) => {
+      const ai = INDUSTRY_ORDER.indexOf(a);
+      const bi = INDUSTRY_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    }
+  );
+
+  return {
+    industries: sortedIndustries.filter(l => l !== "质量标杆").map(l => ({ k: IND_LABEL_MAP[l] || l, l })),
+    caps: Array.from(capSet).sort().map(l => ({ k: CAPS_K_MAP[l] || l, l })),
+    thresholds: Array.from(thresholdSet).filter(l => l !== "人才").sort().map(l => ({
+      k: THRESHOLD_K_MAP[l] || l, l
+    })),
+    depts: Array.from(deptMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([l, cnt]) => ({ k: l, l, cnt })),
+    cats: Array.from(catMap.entries())
+      .sort(([, a], [, b]) => b - a)
+      .map(([l, cnt]) => ({ k: l, l, cnt })),
+  };
+}
+
+export function fmtDate(d: Date | null): string {
+  if (!d) return "长期有效";
+  return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, "0")}月${String(d.getDate()).padStart(2, "0")}日`;
+}
+
+// ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
+// Uses Tauri invoke to call Rust backend Feishu proxy commands.
+
+const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
+const POLICY_SHEET_ID = "0aad30";
+
+interface TenantToken { token: string; expiresAt: number; }
+let cachedToken: TenantToken | null = null;
+
+// 凭证缺失时抛出此错误，调用方应降级到 mock 数据
+export class FeishuCredentialsMissing extends Error {
+  constructor() {
+    super("FEISHU_CREDENTIALS_MISSING");
+    this.name = "FeishuCredentialsMissing";
+  }
+}
+
+async function getTenantToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < cachedToken.expiresAt - 300000) {
+    return cachedToken.token;
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  try {
+    const token: string = await invoke("feishu_token", {});
+    cachedToken = { token, expiresAt: now + 3600 * 1000 };
+    return token;
+  } catch (e: unknown) {
+    const msg = String(e);
+    if (msg.includes("not set") || msg.includes("未设置") || msg.includes("missing")) {
+      throw new FeishuCredentialsMissing();
+    }
+    throw e;
+  }
+}
+
+async function getSheetData(sheetToken: string, sheetId: string, range?: string): Promise<unknown[][]> {
+  const queryRange = range || "A1:AA1000";
+  const token = await getTenantToken();
+  const { invoke } = await import("@tauri-apps/api/core");
+  const result: any = await invoke("feishu_sheet", {
+    token,
+    spreadsheet: sheetToken,
+    sheetId,
+    range: queryRange,
+  });
+  if (result?.code !== 0) throw new Error(`Feishu API error: ${result?.msg}`);
+  return result?.data?.valueRange?.values || [];
+}
+
+export async function getPolicySheetRows(): Promise<unknown[][]> {
+  if (import.meta.env.VITE_USE_WORKERS) {
+    const { fetchPoliciesFromWorkers } = await import("./workers");
+    const result = await fetchPoliciesFromWorkers();
+    // Transform SheetData back to unknown[][] format for loadPolicies()
+    return [result.headers, ...result.data.map(row =>
+      result.headers.map(h => row[h] ?? null)
+    )];
+  }
+  return getSheetData(POLICY_SPREADSHEET, POLICY_SHEET_ID, "A1:U600");
+}
+
+// ── 物业数据加载（适配 Vite/Tauri 浏览器环境）───────────────────────────────
+
+const PROPERTY_SPREADSHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg";
+const PROPERTY_SHEET_IDS: Record<string, string> = {
+  "园区": "4hdJSg",
+  "楼宇": "4hdJSh",
+  "单元": "4hdJSi",
+  "产业字典": "4hdJSj",
+};
+
+export interface Park {
+  park_id: string;
+  name: string;
+  district: string;
+  address: string;
+  industry_direction: string;
+  built_year: number | null;
+  canteen: string | null;
+  dormitory: string | null;
+  parking_total: string | null;
+  exhibition_hall: string | null;
+  meeting_rooms: string | null;
+  fire_rating: string | null;
+  security_level: string | null;
+  land_nature: string | null;
+  is_104_block: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+export interface Building {
+  building_id: string;
+  park_id: string;
+  name: string;
+  type: string;
+  floors: number | null;
+  area_vacant: number | null;
+  occupancy_rate: number | null;
+  built_year: number | null;
+  property_fee: number | null;
+  ac_type: string | null;
+  ac_hours: string | null;
+  network_mbps: number | null;
+  power_kv: number | null;
+  has_gas: string | null;
+  has_drainage: string | null;
+  waste_gas_facility: string | null;
+  column_spacing: number | null;
+  floor_thickness: number | null;
+  has_crane_beam: string | null;
+  fire_sprinkler: string | null;
+  fire_extinguisher: string | null;
+  hydrant: string | null;
+  independent_access: string | null;
+  industry: string | null;
+  contact: string | null;
+  phone: string | null;
+  rel_x: number | null;
+  rel_y: number | null;
+  elevator_p: number | null;
+  elevator_c: number | null;
+  "纬度(lat)": number | null;
+  "经度(lng)": number | null;
+}
+
+export interface Unit {
+  unit_id: string;
+  building_id: string;
+  floor: number | null;
+  unit_no: string | null;
+  area_total: number | null;
+  area_rented: number | null;
+  area_vacant: number | null;
+  area_min_split: number | null;
+  support_split: string | null;
+  floor_height: number | null;
+  load: number | null;
+  price: number | null;
+  deposit_ratio: number | null;
+  min_lease_year: number | null;
+  wc_count: number | null;
+  pantry: string | null;
+  allow_catering: string | null;
+  allow_hazardous: string | null;
+  remark: string | null;
+}
+
+export interface Property {
+  unit_id: string;
+  floor: number | null;
+  unit_no: string | null;
+  area_total: number | null;
+  area_vacant: number | null;
+  area_min_split: number | null;
+  support_split: string | null;
+  floor_height: number | null;
+  load: number | null;
+  price: number | null;
+  deposit_ratio: number | null;
+  min_lease_year: number | null;
+  wc_count: number | null;
+  pantry: string | null;
+  allow_catering: string | null;
+  allow_hazardous: string | null;
+  remark: string | null;
+  building_id: string;
+  building_name: string;
+  building_type: string;
+  floors: number | null;
+  elevator_p: number | null;
+  elevator_c: number | null;
+  occupancy_rate: number | null;
+  property_fee: number | null;
+  ac_type: string | null;
+  ac_hours: string | null;
+  network_mbps: number | null;
+  power_kv: number | null;
+  has_gas: string | null;
+  has_drainage: string | null;
+  waste_gas_facility: string | null;
+  column_spacing: number | null;
+  fire_sprinkler: string | null;
+  industry: string | null;
+  contact: string | null;
+  phone: string | null;
+  park_id: string;
+  park_name: string;
+  district: string;
+  address: string;
+  canteen: string | null;
+  dormitory: string | null;
+  parking_total: string | null;
+  exhibition_hall: string | null;
+  meeting_rooms: string | null;
+  land_nature: string | null;
+  is_104_block: string | null;
+}
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const CACHE_PREFIX = "pm_cache_";
+const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+
+export function getCached<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as CacheEntry<T>;
+    if (Date.now() - entry.timestamp > CACHE_TTL) {
+      localStorage.removeItem(CACHE_PREFIX + key);
+      return null;
+    }
+    return entry.data;
+  } catch { return null; }
+}
+
+export function setCache<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch { /* storage full or unavailable */ }
+}
+
+// Background refresh — returns cached data immediately, fetches new in background
+async function cacheOrRefresh<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = getCached<T>(key);
+  if (cached) {
+    console.log('[cacheOrRefresh] Using cached data for', key);
+    // Kick off background refresh (fire-and-forget)
+    fetcher().then(data => { console.log('[cacheOrRefresh] Background refresh OK for', key); setCache(key, data); }).catch(e => { console.warn('[cacheOrRefresh] Background refresh failed for', key, e); });
+    return cached;
+  }
+  const data = await fetcher();
+  setCache(key, data);
+  return data;
+}
+
+async function getSheetAsObjects<T = Record<string, unknown>>(sheetName: string, startRow = 3): Promise<T[]> {
+  // Workers 模式下直接调 Workers API
+  if (import.meta.env.VITE_USE_WORKERS) {
     try {
       rawIndustries = await getSheetAsObjects<RawIndustry>(PROPERTY_SPREADSHEET, "4hdJSj", 3);
     } catch (e) {

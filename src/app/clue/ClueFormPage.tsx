@@ -277,3 +277,4 @@ export default function ClueFormPage({ standalone }: Props = {}) {
       </div>
     </div>
   );
+}
