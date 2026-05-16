@@ -3429,6 +3429,50 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   background: var(--bg-surface);
 }
 
+.dashboard-strip {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-2);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 90px;
+}
+
+.stat-card.highlight-red {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.stat-card.highlight-yellow {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.stat-card.highlight-red .stat-value { color: #ef4444; }
+.stat-card.highlight-yellow .stat-value { color: #f59e0b; }
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+
 .detail-tab {
   flex: 1;
   padding: 12px 16px;

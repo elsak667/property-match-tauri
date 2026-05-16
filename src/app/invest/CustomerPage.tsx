@@ -18,6 +18,32 @@ const STAGE_COLORS: Record<CustomerStage, string> = {
   "签约入驻": "#22c55e",
 };
 
+// Dashboard stats
+function useStats(customers: Customer[]) {
+  const total = customers.length;
+  const stageCounts = STAGE_OPTIONS.reduce((acc, s) => {
+    acc[s] = customers.filter(c => c.stage === s).length;
+    return acc;
+  }, {} as Record<CustomerStage, number>);
+
+  const signed = stageCounts["签约入驻"] || 0;
+  const conversionRate = total > 0 ? Math.round((signed / total) * 100) : 0;
+
+  const now = new Date();
+  const redCount = customers.filter(c => {
+    if (!c.lease_end) return false;
+    const diff = Math.ceil((new Date(c.lease_end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diff <= 30;
+  }).length;
+  const yellowCount = customers.filter(c => {
+    if (!c.lease_end) return false;
+    const diff = Math.ceil((new Date(c.lease_end).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diff > 30 && diff <= 90;
+  }).length;
+
+  return { total, stageCounts, conversionRate, redCount, yellowCount };
+}
+
 // 租期预警组件
 function LeaseWarning({ customer }: { customer: Customer }) {
   const leaseEnd = customer.lease_end;
@@ -411,6 +437,8 @@ export default function CustomerPage() {
     }
   }, []);
 
+  const stats = useStats(customers);
+
   useEffect(() => { loadCustomers(); }, [loadCustomers]);
 
   const handleCreated = () => {
@@ -555,6 +583,32 @@ export default function CustomerPage() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Dashboard */}
+        <div className="dashboard-strip">
+          <div className="stat-card">
+            <div className="stat-value">{stats.total}</div>
+            <div className="stat-label">客户总数</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{stats.conversionRate}%</div>
+            <div className="stat-label">转化率</div>
+          </div>
+          <div className="stat-card highlight-red">
+            <div className="stat-value">{stats.redCount}</div>
+            <div className="stat-label">即将到期(≤30天)</div>
+          </div>
+          <div className="stat-card highlight-yellow">
+            <div className="stat-value">{stats.yellowCount}</div>
+            <div className="stat-label">近期到期(31-90天)</div>
+          </div>
+          {STAGE_OPTIONS.map(s => (
+            <div key={s} className="stat-card">
+              <div className="stat-value">{stats.stageCounts[s] || 0}</div>
+              <div className="stat-label">{s}</div>
+            </div>
+          ))}
         </div>
 
         <div className="split-panel">
