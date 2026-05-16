@@ -3,6 +3,7 @@
  * 从 Python Flask app (v1.2) 移植
  */
 import { cacheOrRefresh } from "./policy/cache";
+import { getPolicySheetRows } from "./policy/feishu";
 import {
   IND_LABEL_MAP,
   LOCATIONS,
@@ -15,7 +16,6 @@ import type {
   Policy,
   MatchQuery,
   MatchResult,
-  IndustryCategory,
 } from "./policy/types";
 import {
   industryToKs,
@@ -28,61 +28,12 @@ import {
   parseFeishuRichText,
   fmtDate,
 } from "./policy/parser";
-import profilesData from "../app/property/industry_profiles.json";
 // ── 权重 ───────────────────────────────────────────────────────────────────
 const P_IND = 5;
 const P_SUB = 2;
 const P_CAP = 1;
 const P_LOC = 1;
 const P_THRESHOLD = 1;
-// ── 行业字典 mock fallback ─────────────────────────────────────────────────
-interface IndustryProfiles {
-  description: string;
-  version: string;
-  lastUpdated: string;
-  categories: Array<{
-    name: string;
-    code: string;
-    industries: Array<{
-      code: string;
-      name: string;
-      alias: string[];
-      loadMin: number | null;
-      heightMin: number | null;
-      priceMax: number | null;
-      powerKV: number | null;
-      dualPower: boolean | null;
-      cleanliness: string | null;
-      fireRating: string | null;
-      envAssessment: string | null;
-      special: string[];
-      remark: string;
-    }>;
-  }>;
-}
-const MOCK_INDUSTRIES_FALLBACK: { categories: IndustryCategory[] } = {
-  categories: (profilesData as IndustryProfiles).categories.map(cat => ({
-    name: cat.name,
-    code: cat.code,
-    industries: cat.industries.map(ind => ({
-      code: ind.code,
-      name: ind.name,
-      alias: ind.alias,
-      loadMin: ind.loadMin,
-      heightMin: ind.heightMin,
-      priceMax: ind.priceMax,
-      powerKV: ind.powerKV,
-      dualPower: ind.dualPower,
-      cleanliness: ind.cleanliness,
-      fireRating: ind.fireRating,
-      envAssessment: ind.envAssessment,
-      special: ind.special,
-      remark: ind.remark,
-    })),
-  })),
-};
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _MOCK_INDUSTRIES_FALLBACK_EXPORT = MOCK_INDUSTRIES_FALLBACK; // used by policy/index.ts
 // ── 政策数据加载 ─────────────────────────────────────────────────────────────
 export async function loadPolicies(): Promise<Policy[]> {
   return cacheOrRefresh<Policy[]>("policies", async () => {
@@ -323,78 +274,7 @@ export async function buildFilterOptions(policies: Policy[]): Promise<FilterOpti
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
 // Uses Tauri invoke to call Rust backend Feishu proxy commands.
 
-// ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
-const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
-const POLICY_SHEET_ID = "0aad30";
-
-// Tauri API — only imported when invoked (dynamic import inside functions)
-// @tauri-apps/api/core is only available in Tauri context, not in web workers
-
-interface TenantToken { token: string; expiresAt: number; }
-let cachedToken: TenantToken | null = null;
-
-// 凭证缺失时抛出此错误，调用方应降级到 mock 数据
-export class FeishuCredentialsMissing extends Error {
-  constructor() {
-    super("FEISHU_CREDENTIALS_MISSING");
-    this.name = "FeishuCredentialsMissing";
-  }
-}
-
-async function getTenantToken(): Promise<string> {
-  const now = Date.now();
-  if (cachedToken && now < cachedToken.expiresAt - 300000) {
-    return cachedToken.token;
-  }
-  const { invoke } = await import("@tauri-apps/api/core");
-  try {
-    const token: string = await invoke("feishu_token", {});
-    cachedToken = { token, expiresAt: now + 3600 * 1000 };
-    return token;
-  } catch (e: unknown) {
-    const msg = String(e);
-    if (msg.includes("not set") || msg.includes("未设置") || msg.includes("missing")) {
-      throw new FeishuCredentialsMissing();
-    }
-    throw e;
-  }
-}
-
-async function getSheetData(sheetToken: string, sheetId: string, range?: string): Promise<unknown[][]> {
-  const queryRange = range || "A1:AA1000";
-  const token = await getTenantToken();
-  const { invoke } = await import("@tauri-apps/api/core");
-  const result: any = await invoke("feishu_sheet", {
-    token,
-    spreadsheet: sheetToken,
-    sheetId,
-    range: queryRange,
-  });
-  if (result?.code !== 0) throw new Error(`Feishu API error: ${result?.msg}`);
-  return result?.data?.valueRange?.values || [];
-}
-
-export async function getPolicySheetRows(): Promise<unknown[][]> {
-  if (import.meta.env.VITE_USE_WORKERS) {
-    const { fetchPoliciesFromWorkers } = await import("./workers");
-    const result = await fetchPoliciesFromWorkers();
-    // Transform SheetData back to unknown[][] format for loadPolicies()
-    return [result.headers, ...result.data.map(row =>
-      result.headers.map(h => row[h] ?? null)
-    )];
-  }
-  return getSheetData(POLICY_SPREADSHEET, POLICY_SHEET_ID, "A1:U600");
-}
-
 // ── 物业数据加载（适配 Vite/Tauri 浏览器环境）───────────────────────────────
-
-const PROPERTY_SPREADSHEET = "X1jRs1PhLhR8WetSwktcM9Fgnhg";
-const PROPERTY_SHEET_IDS: Record<string, string> = {
-  "园区": "4hdJSg",
-  "楼宇": "4hdJSh",
-  "单元": "4hdJSi",
-  "产业字典": "4hdJSj",
-};
 
 export interface Park {
   park_id: string;
