@@ -18,6 +18,25 @@ const STAGE_COLORS: Record<CustomerStage, string> = {
   "签约入驻": "#22c55e",
 };
 
+// 租期预警组件
+function LeaseWarning({ customer }: { customer: Customer }) {
+  const leaseEnd = customer.lease_end;
+  if (!leaseEnd) return <span className="lease-none">-</span>;
+
+  const end = new Date(leaseEnd);
+  const now = new Date();
+  const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return <span className="lease-overdue">已到期</span>;
+  } else if (diffDays <= 30) {
+    return <span className="lease-warning">{diffDays}天后到期</span>;
+  } else if (diffDays <= 90) {
+    return <span className="lease-soon">{diffDays}天</span>;
+  }
+  return <span className="lease-normal">{diffDays}天</span>;
+}
+
 // Tab types
 type DetailTab = "基本信息" | "跟进记录" | "进度历史";
 
@@ -470,8 +489,8 @@ export default function CustomerPage() {
                     <th>行业</th>
                     <th>招商人员</th>
                     <th>阶段</th>
-                    <th>来源</th>
-                    <th>创建时间</th>
+                    <th>承租载体</th>
+                    <th>租期预警</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -492,15 +511,17 @@ export default function CustomerPage() {
                           {customer.stage}
                         </span>
                       </td>
-                      <td>{customer.source}</td>
-                      <td>{customer.created_at || "-"}</td>
+                      <td>{customer.current_location || "-"}</td>
+                      <td>
+                        <LeaseWarning customer={customer} />
+                      </td>
                     </tr>
                   ))}
                   {loading ? (
-                    <tr><td colSpan={6} className="empty-cell">加载中...</td></tr>
+                    <tr><td colSpan={7} className="empty-cell">加载中...</td></tr>
                   ) : filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="empty-cell">暂无客户数据</td>
+                      <td colSpan={7} className="empty-cell">暂无客户数据</td>
                     </tr>
                   ) : null}
                 </tbody>

@@ -3614,3 +3614,33 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   grid-column: 1 / -1;
 }
 
+
+/* 租期预警样式 */
+.lease-none { color: var(--text-3); }
+.lease-warning {
+  color: #ef4444;
+  font-weight: 600;
+  background: rgba(239,68,68,0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.lease-soon {
+  color: #f59e0b;
+  background: rgba(245,158,11,0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.lease-normal {
+  color: var(--text-2);
+  font-size: 12px;
+}
+.lease-overdue {
+  color: #991b1b;
+  font-weight: 600;
+  background: rgba(153,27,27,0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
