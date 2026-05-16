@@ -27,6 +27,7 @@ export interface PolicyResult {
   contactInfo: string;
   _reasons: string[];
   stars?: string;
+  _精准匹配?: unknown;
 }
 
 export interface FilterOption {

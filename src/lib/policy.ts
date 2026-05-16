@@ -3,11 +3,13 @@
  * 从 Python Flask app (v1.2) 移植
  */
 import { cacheOrRefresh } from "./policy/cache";
-import { getPolicySheetRows, getSheetAsObjects, FeishuCredentialsMissing } from "./policy/feishu";
 import {
   IND_LABEL_MAP,
   LOCATIONS,
   SUBJECTS,
+  INDUSTRY_ORDER,
+  CAPS_K_MAP,
+  THRESHOLD_K_MAP,
 } from "./policy/constants";
 import type {
   Policy,
@@ -316,11 +318,6 @@ export async function buildFilterOptions(policies: Policy[]): Promise<FilterOpti
       .sort(([, a], [, b]) => b - a)
       .map(([l, cnt]) => ({ k: l, l, cnt })),
   };
-}
-
-export function fmtDate(d: Date | null): string {
-  if (!d) return "长期有效";
-  return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, "0")}月${String(d.getDate()).padStart(2, "0")}日`;
 }
 
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────

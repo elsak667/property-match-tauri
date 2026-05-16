@@ -29,7 +29,6 @@ const ITEMS: LauncherItem[] = [
 export default function Launcher() {
   const [hoverOpen, setHoverOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const [aiResult, setAiResult] = useState<unknown>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleItemClick = useCallback((id: ActivePanel) => {
@@ -42,12 +41,8 @@ export default function Launcher() {
     setActivePanel(null);
   }, []);
 
-  const handleAiResultChange = useCallback((res: unknown) => {
-    setAiResult(res);
-  }, []);
-
-  const handleAiBuildingClick = useCallback((buildingId: string) => {
-    (window as unknown as Record<string, unknown>).__setPage__?.("property");
+  const handleAiBuildingClick = useCallback((_buildingId: string) => {
+    (window as unknown as Record<string, (page: string) => void>).__setPage__?.("property");
   }, []);
 
   const handleMouseEnter = () => {
@@ -102,7 +97,6 @@ export default function Launcher() {
             </div>
             <AIAssistant
               aiActiveBuildingId={null}
-              onAiResultChange={handleAiResultChange}
               onAiBuildingClick={handleAiBuildingClick}
               autoOpen
               inLauncher

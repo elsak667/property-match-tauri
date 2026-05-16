@@ -12,25 +12,8 @@ import "./index.css";
 
 type Page = "home" | "policy" | "property" | "customer" | "placeholder-industry" | "clue";
 
-interface AiPropertyMatch {
-  id: number;
-  name: string;
-  building: string;
-  building_id: string;
-  park: string;
-  match_reason: string;
-  score: number;
-}
-interface AiSearchResult {
-  policies: unknown[];
-  properties: AiPropertyMatch[];
-  summary: string;
-}
-
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
-  const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
-  const [aiActiveBuildingId, setAiActiveBuildingId] = useState<string | null>(null);
   const { policies } = usePolicies();
   const { properties } = useProperties();
   const { news } = useNews();
@@ -54,14 +37,7 @@ export default function App() {
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
           {currentPage === "property" && (
-            <CarrierPage
-              aiResult={aiResult}
-              onAiBuildingClick={(buildingId: string) => {
-                setAiActiveBuildingId(buildingId);
-                setCurrentPage("property");
-              }}
-              aiActiveBuildingId={aiActiveBuildingId}
-            />
+            <CarrierPage />
           )}
           {currentPage === "customer" && <CustomerPage />}
           {currentPage === "placeholder-industry" && (
@@ -75,18 +51,7 @@ export default function App() {
         </div>
       </div>
       <MobileTabBar currentPage={currentPage} onNavigate={(p) => setCurrentPage(p)} />
-      <Launcher
-        aiActiveBuildingId={aiActiveBuildingId}
-        onAiResultChange={setAiResult}
-        onAiBuildingClick={(buildingId: string) => {
-          if (buildingId === "") {
-            setAiActiveBuildingId(null);
-          } else {
-            setAiActiveBuildingId(buildingId);
-            if (currentPage !== "property") setCurrentPage("property");
-          }
-        }}
-      />
+      <Launcher />
     </div>
   );
 }
