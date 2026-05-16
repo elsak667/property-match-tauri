@@ -392,6 +392,11 @@ export default function CustomerPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [filterStage, setFilterStage] = useState<CustomerStage | "全部">("全部");
   const [searchName, setSearchName] = useState("");
+  const [filterIndustry, setFilterIndustry] = useState("");
+  const [filterRevenue, setFilterRevenue] = useState("");
+  const [filterStaff, setFilterStaff] = useState("");
+  const [filterRentalStatus, setFilterRentalStatus] = useState("");
+  const [filterLeaseWarning, setFilterLeaseWarning] = useState<"全部" | "红" | "黄">("全部");
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
@@ -435,7 +440,24 @@ export default function CustomerPage() {
   const filteredCustomers = customers.filter(c => {
     const matchesStage = filterStage === "全部" || c.stage === filterStage;
     const matchesName = c.name.toLowerCase().includes(searchName.toLowerCase());
-    return matchesStage && matchesName;
+    const matchesIndustry = !filterIndustry || c.industry === filterIndustry;
+    const matchesRevenue = !filterRevenue || c.revenue_level === filterRevenue;
+    const matchesStaff = !filterStaff || c.investment_staff === filterStaff;
+    const matchesRentalStatus = !filterRentalStatus || c.rental_status === filterRentalStatus;
+
+    // Lease warning filter
+    if (filterLeaseWarning !== "全部") {
+      const now = new Date();
+      const end = c.lease_end ? new Date(c.lease_end) : null;
+      const diffDays = end ? Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      if (filterLeaseWarning === "红") {
+        if (diffDays === null || diffDays > 30) return false;
+      } else if (filterLeaseWarning === "黄") {
+        if (diffDays === null || diffDays <= 30 || diffDays > 90) return false;
+      }
+    }
+
+    return matchesStage && matchesName && matchesIndustry && matchesRevenue && matchesStaff && matchesRentalStatus;
   });
 
   return (
@@ -464,6 +486,62 @@ export default function CustomerPage() {
               {STAGE_OPTIONS.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
+            </select>
+            <select
+              className="filter-select"
+              value={filterIndustry}
+              onChange={e => setFilterIndustry(e.target.value)}
+            >
+              <option value="">全部行业</option>
+              <option value="互联网/IT">互联网/IT</option>
+              <option value="金融">金融</option>
+              <option value="制造业">制造业</option>
+              <option value="贸易">贸易</option>
+              <option value="专业服务">专业服务</option>
+              <option value="教育培训">教育培训</option>
+              <option value="医疗健康">医疗健康</option>
+              <option value="其他">其他</option>
+            </select>
+            <select
+              className="filter-select"
+              value={filterRevenue}
+              onChange={e => setFilterRevenue(e.target.value)}
+            >
+              <option value="">全部规模</option>
+              <option value="初创">初创</option>
+              <option value="中小型">中小型</option>
+              <option value="大型">大型</option>
+              <option value="上市公司">上市公司</option>
+            </select>
+            <select
+              className="filter-select"
+              value={filterStaff}
+              onChange={e => setFilterStaff(e.target.value)}
+            >
+              <option value="">全部招商员</option>
+              {[...new Map(customers.map(c => [c.investment_staff, c.investment_staff])).keys()]
+                .filter(Boolean).sort().map(staff => (
+                <option key={staff} value={staff as string}>{staff as string}</option>
+              ))}
+            </select>
+            <select
+              className="filter-select"
+              value={filterRentalStatus}
+              onChange={e => setFilterRentalStatus(e.target.value)}
+            >
+              <option value="">全部租约状态</option>
+              <option value="正常">正常</option>
+              <option value="欠租">欠租</option>
+              <option value="已退">已退</option>
+            </select>
+            <select
+              className="filter-select"
+              value={filterLeaseWarning}
+              onChange={e => setFilterLeaseWarning(e.target.value as "全部" | "红" | "黄")}
+            >
+              <option value="全部">全部预警</option>
+              <option value="红">红（≤30天）</option>
+              <option value="黄">黄（31-90天）</option>
             </select>
             <button
               className="btn-primary"
