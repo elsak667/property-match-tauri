@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import type { Customer, CustomerStage } from "./types";
-import { getCustomers } from "../../lib/invest/customer";
+import { getCustomers, updateCustomer } from "../../lib/invest/customer";
 import { getVisits, createVisit, type VisitRecord } from "../../lib/invest/visit";
 import CustomerForm from "./CustomerForm";
 
@@ -69,10 +69,11 @@ type DetailTab = "基本信息" | "跟进记录" | "进度历史";
 interface DetailPanelProps {
   customer: Customer;
   onEdit: (customer: Customer) => void;
+  onStageChange: (customerId: string, newStage: CustomerStage) => void;
   onClose: () => void;
 }
 
-function DetailPanel({ customer, onEdit, onClose }: DetailPanelProps) {
+function DetailPanel({ customer, onEdit, onStageChange, onClose }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("基本信息");
 
   // Visit records state
@@ -87,6 +88,7 @@ function DetailPanel({ customer, onEdit, onClose }: DetailPanelProps) {
     visit_content: "",
     next_step: "",
     investment_staff: customer.investment_staff || "",
+    stage_changed_to: "" as CustomerStage | "",
   });
   const [visitMsg, setVisitMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -110,14 +112,22 @@ function DetailPanel({ customer, onEdit, onClose }: DetailPanelProps) {
   const handleVisitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createVisit(customer.customer_id, {
+      const visitData = {
         customer_name: customer.name,
-        ...visitForm,
-      });
+        visit_date: visitForm.visit_date,
+        visit_purpose: visitForm.visit_purpose,
+        visit_content: visitForm.visit_content,
+        next_step: visitForm.next_step,
+        investment_staff: visitForm.investment_staff,
+      };
+      await createVisit(customer.customer_id, visitData);
+      // Stage change via follow-up
+      if (visitForm.stage_changed_to && visitForm.stage_changed_to !== customer.stage) {
+        await onStageChange(customer.customer_id, visitForm.stage_changed_to as CustomerStage);
+      }
       setVisitMsg({ type: "success", text: "跟进记录已创建" });
       setShowVisitForm(false);
-      setVisitForm({ visit_date: "", visit_purpose: "", visit_content: "", next_step: "", investment_staff: customer.investment_staff || "" });
-      // Refresh list
+      setVisitForm({ visit_date: "", visit_purpose: "", visit_content: "", next_step: "", investment_staff: customer.investment_staff || "", stage_changed_to: "" });
       const data = await getVisits(customer.customer_id);
       setVisits(data);
     } catch (err) {
@@ -354,6 +364,16 @@ function DetailPanel({ customer, onEdit, onClose }: DetailPanelProps) {
                     <input type="text" value={visitForm.investment_staff}
                       onChange={e => setVisitForm(f => ({ ...f, investment_staff: e.target.value }))} />
                   </div>
+                  <div className="form-field">
+                    <label>同步更新阶段</label>
+                    <select value={visitForm.stage_changed_to}
+                      onChange={e => setVisitForm(f => ({ ...f, stage_changed_to: e.target.value as CustomerStage | "" }))}>
+                      <option value="">不更新阶段</option>
+                      {STAGE_OPTIONS.filter(s => s !== customer.stage).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="form-actions">
                     <button type="submit" className="btn-primary">保存</button>
                     <button type="button" className="btn-secondary" onClick={() => { setShowVisitForm(false); setVisitMsg(null); }}>取消</button>
@@ -451,6 +471,16 @@ export default function CustomerPage() {
     setSelectedCustomer(null);
     setEditingCustomer(customer);
     setShowForm(true);
+  };
+
+  const handleStageChange = async (customerId: string, newStage: CustomerStage) => {
+    const customer = customers.find(c => c.customer_id === customerId);
+    if (!customer) return;
+    await updateCustomer(customerId, { stage: newStage } as Parameters<typeof updateCustomer>[1]);
+    setCustomers(prev => prev.map(c => c.customer_id === customerId ? { ...c, stage: newStage } : c));
+    if (selectedCustomer?.customer_id === customerId) {
+      setSelectedCustomer(prev => prev ? { ...prev, stage: newStage } : null);
+    }
   };
 
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -677,6 +707,7 @@ export default function CustomerPage() {
               <DetailPanel
                 customer={selectedCustomer}
                 onEdit={handleEdit}
+                onStageChange={handleStageChange}
                 onClose={() => setSelectedCustomer(null)}
               />
             ) : (
