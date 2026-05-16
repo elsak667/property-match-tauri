@@ -15,9 +15,7 @@ import type {
   Policy,
   MatchQuery,
   MatchResult,
-  IndustryProfile,
   IndustryCategory,
-  RawIndustry,
 } from "./policy/types";
 import {
   industryToKs,
@@ -83,6 +81,8 @@ const MOCK_INDUSTRIES_FALLBACK: { categories: IndustryCategory[] } = {
     })),
   })),
 };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _MOCK_INDUSTRIES_FALLBACK_EXPORT = MOCK_INDUSTRIES_FALLBACK; // used by policy/index.ts
 // ── 政策数据加载 ─────────────────────────────────────────────────────────────
 export async function loadPolicies(): Promise<Policy[]> {
   return cacheOrRefresh<Policy[]>("policies", async () => {
@@ -323,8 +323,12 @@ export async function buildFilterOptions(policies: Policy[]): Promise<FilterOpti
 // ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
 // Uses Tauri invoke to call Rust backend Feishu proxy commands.
 
+// ── 飞书 API 集成（适配 Vite/Tauri 浏览器环境）───────────────────────────────
 const POLICY_SPREADSHEET = "DwqqsS6TShlGhAteDf3cHRwvnHe";
 const POLICY_SHEET_ID = "0aad30";
+
+// Tauri API — only imported when invoked (dynamic import inside functions)
+// @tauri-apps/api/core is only available in Tauri context, not in web workers
 
 interface TenantToken { token: string; expiresAt: number; }
 let cachedToken: TenantToken | null = null;

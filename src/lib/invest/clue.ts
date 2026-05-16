@@ -12,7 +12,7 @@ export async function getClues(): Promise<Clue[]> {
     throw new Error(`获取线索失败: HTTP ${res.status} body=${text.slice(0, 200)}`);
   }
   const data = JSON.parse(text) as { data: Record<string, unknown>[] };
-  return data.data as Clue[];
+  return data.data as unknown as Clue[];
 }
 
 export async function updateClueStatus(id: string, status: string): Promise<void> {

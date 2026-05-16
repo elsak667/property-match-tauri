@@ -27,7 +27,12 @@ export interface PolicyResult {
   contactInfo: string;
   _reasons: string[];
   stars?: string;
-  _精准匹配?: unknown;
+  _精准匹配?: {
+    matched: boolean;
+    matchedConditions: string[];
+    unmatchedConditions: string[];
+    overallReason?: string;
+  };
 }
 
 export interface FilterOption {
