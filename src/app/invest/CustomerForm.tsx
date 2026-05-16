@@ -4,6 +4,7 @@ import type { Customer } from "./types";
 
 interface CustomerFormProps {
   customerId?: string;
+  initialData?: Partial<Omit<Customer, "customer_id" | "created_at" | "updated_at">>;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -31,7 +32,7 @@ const initialFormData: Omit<Customer, "customer_id" | "created_at" | "updated_at
   stage: "初步接触",
 };
 
-export default function CustomerForm({ customerId, onSave, onCancel }: CustomerFormProps) {
+export default function CustomerForm({ customerId, initialData, onSave, onCancel }: CustomerFormProps) {
   const [formData, setFormData] = useState(initialFormData);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -40,17 +41,19 @@ export default function CustomerForm({ customerId, onSave, onCancel }: CustomerF
   const isEditing = !!customerId;
 
   useEffect(() => {
-    if (customerId) {
+    if (initialData && Object.keys(initialData).length > 0) {
+      setFormData(prev => ({ ...prev, ...initialData }));
+    } else if (customerId) {
       getCustomer(customerId)
         .then(customer => {
           const { customer_id, created_at, updated_at, ...rest } = customer;
-          setFormData(rest);
+          setFormData(prev => ({ ...prev, ...rest }));
         })
         .catch(() => {
           setMessage({ type: "error", text: "加载客户信息失败" });
         });
     }
-  }, [customerId]);
+  }, [customerId, initialData]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -101,8 +104,9 @@ export default function CustomerForm({ customerId, onSave, onCancel }: CustomerF
         setMessage({ type: "success", text: "客户创建成功！" });
       }
       onSave();
-    } catch {
-      setMessage({ type: "error", text: "保存失败，请稍后重试" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessage({ type: "error", text: `保存失败: ${msg}` });
     } finally {
       setSubmitting(false);
     }
