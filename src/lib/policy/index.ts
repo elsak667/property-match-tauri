@@ -9,6 +9,5 @@ export * from "./cache";
 export {
   loadPolicies,
   matchPolicies,
-  loadIndustries,
   fmtDate,
 } from "../policy";

@@ -98,7 +98,7 @@ export default function ClueAdminPage() {
   const [clues, setClues] = useState<Clue[]>([]);
   const [selectedClue, setSelectedClue] = useState<Clue | null>(null);
   const [filterStatus, setFilterStatus] = useState<ClueStatus | "全部">("全部");
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadClues = () => {

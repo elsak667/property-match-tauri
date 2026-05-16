@@ -102,7 +102,7 @@ function DetailPanel({ customer, onEdit, onStageChange, onClose }: DetailPanelPr
     if (activeTab !== "跟进记录") return;
     let cancelled = false;
     setVisitsLoading(true);
-    getVisits(customer.customer_id)
+    getVisits(customer.customer_id ?? "")
       .then(data => { if (!cancelled) setVisits(data); })
       .catch(() => { if (!cancelled) setVisits([]); })
       .finally(() => { if (!cancelled) setVisitsLoading(false); });
@@ -112,7 +112,8 @@ function DetailPanel({ customer, onEdit, onStageChange, onClose }: DetailPanelPr
   const handleVisitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const visitData = {
+      const visitPayload = {
+        customer_id: customer.customer_id ?? "",
         customer_name: customer.name,
         visit_date: visitForm.visit_date,
         visit_purpose: visitForm.visit_purpose,
@@ -120,15 +121,15 @@ function DetailPanel({ customer, onEdit, onStageChange, onClose }: DetailPanelPr
         next_step: visitForm.next_step,
         investment_staff: visitForm.investment_staff,
       };
-      await createVisit(customer.customer_id, visitData);
+      await createVisit(customer.customer_id ?? "", visitPayload);
       // Stage change via follow-up
       if (visitForm.stage_changed_to && visitForm.stage_changed_to !== customer.stage) {
-        await onStageChange(customer.customer_id, visitForm.stage_changed_to as CustomerStage);
+        await onStageChange(customer.customer_id ?? "", visitForm.stage_changed_to as CustomerStage);
       }
       setVisitMsg({ type: "success", text: "跟进记录已创建" });
       setShowVisitForm(false);
       setVisitForm({ visit_date: "", visit_purpose: "", visit_content: "", next_step: "", investment_staff: customer.investment_staff || "", stage_changed_to: "" });
-      const data = await getVisits(customer.customer_id);
+      const data = await getVisits(customer.customer_id ?? "");
       setVisits(data);
     } catch (err) {
       setVisitMsg({ type: "error", text: `创建失败: ${err}` });
