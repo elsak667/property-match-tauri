@@ -20,6 +20,8 @@ interface Env {
   CLUE_SHEET_ID: string;
   CUSTOMER_SHEET: string;
   CUSTOMER_SHEET_ID: string;
+  VISIT_SHEET: string;
+  VISIT_SHEET_ID: string;
 }
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
@@ -414,6 +416,33 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
           }
         }
         return json(result);
+      }
+    }
+
+    // ===== 跟进记录 API (Bitable) =====
+    const visitAppToken = env.VISIT_SHEET;
+    const visitTableId = env.VISIT_SHEET_ID;
+    if (visitAppToken && visitTableId) {
+      const visitMatch = path.match(/^\/api\/invest-api\/customers\/([^/]+)\/visits$/);
+      if (visitMatch) {
+        const customerId = visitMatch[1];
+        if (request.method === "GET") {
+          const result = await bitableGetRecords(env, visitAppToken, visitTableId, 100);
+          // Filter to this customer, newest first
+          const items = result.items
+            .filter((r) => String(r.customer_id) === customerId)
+            .sort((a, b) => {
+              const da = new Date(a.visit_date || 0).getTime();
+              const db = new Date(b.visit_date || 0).getTime();
+              return db - da;
+            });
+          return json({ data: items, hasMore: result.hasMore, pageToken: result.pageToken });
+        }
+        if (request.method === "POST") {
+          const body = await request.json() as Record<string, unknown>;
+          const { record_id, fields } = await bitableCreateRecord(env, visitAppToken, visitTableId, body as Record<string, unknown>);
+          return json({ record_id, fields }, 201);
+        }
       }
     }
 

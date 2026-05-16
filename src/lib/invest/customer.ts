@@ -39,6 +39,17 @@ function adaptCustomer(item: BitableItem): Customer {
     investment_staff: f.investment_staff as string | undefined,
     stage: (f.stage as Customer["stage"]) || "初步接触",
     created_at: f.文本 as string | undefined,
+    // 承租信息
+    current_location: f.current_location as string | undefined,
+    rental_area: f.rental_area as number | undefined,
+    lease_start: f.lease_start as string | undefined,
+    lease_end: f.lease_end as string | undefined,
+    rental_status: f.rental_status as Customer["rental_status"],
+    // 联系人
+    contact_name: f.contact_name as string | undefined,
+    contact_title: f.contact_title as string | undefined,
+    contact_phone: f.contact_phone as string | undefined,
+    contact_wechat: f.contact_wechat as string | undefined,
   };
 }
 
