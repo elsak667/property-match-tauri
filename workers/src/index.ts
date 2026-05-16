@@ -343,9 +343,55 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       const body = await request.json() as Record<string, unknown>;
       const { record_id, fields } = await bitableCreateRecord(env, clueAppToken, clueTableId, body as Record<string, unknown>);
       return json({ record_id, fields }, 201);
-    } else if (path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/)) {
-      // 线索转客户（预留）
-      return json({ error: "Not yet implemented: clue conversion" }, 501);
+    } else if (path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/) && request.method === "POST") {
+      // 线索转客户
+      const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/);
+      if (!clueIdMatch || !clueAppToken || !clueTableId) return json({ error: "Not found" }, 404);
+      const clueRecordId = clueIdMatch[1];
+
+      // Fetch clue record
+      const allClues = await bitableGetRecords(env, clueAppToken, clueTableId, 500);
+      const clue = allClues.items.find((r: Record<string, unknown>) => String(r.record_id) === clueRecordId);
+      if (!clue) return json({ error: "Clue not found" }, 404);
+
+      // Validate status is "跟进中" before converting
+      const currentStatus = String(clue.status ?? "");
+      if (currentStatus !== "跟进中") {
+        return json({ error: `只能转化"跟进中"状态的线索，当前状态：${currentStatus}` }, 400);
+      }
+
+      // Build customer fields from clue (filter empty values)
+      const customerFields: Record<string, unknown> = {};
+      const fieldMap: Record<string, string> = {
+        company_name: "name",
+        contact_name: "contact_name",
+        contact_phone: "contact_phone",
+        required_area: "required_area",
+        preferred_district: "preferred_district",
+        investment_staff: "investment_staff",
+      };
+      for (const [src, dst] of Object.entries(fieldMap)) {
+        const val = clue[src];
+        if (val !== "" && val != null) customerFields[dst] = val;
+      }
+      customerFields.source = "载体转化";
+      customerFields.stage = "初步接触";
+
+      // Create customer record
+      if (!env.CUSTOMER_SHEET || !env.CUSTOMER_SHEET_ID) {
+        return json({ error: "Customer sheet not configured" }, 500);
+      }
+      const customerResult = await bitableCreateRecord(
+        env,
+        env.CUSTOMER_SHEET,
+        env.CUSTOMER_SHEET_ID,
+        customerFields,
+      );
+
+      // Update clue status to "已转化"
+      await bitableUpdateRecord(env, clueAppToken, clueTableId, clueRecordId, { status: "已转化" });
+
+      return json({ success: true, customer_id: customerResult.record_id });
     } else {
       // GET/PUT /api/invest-api/clues/:id
       const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);

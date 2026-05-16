@@ -3188,6 +3188,24 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
   border-color: var(--primary);
 }
 
+.btn-convert {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid #22c55e;
+  background: #22c55e;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-right: 6px;
+}
+
+.btn-convert:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
 .empty-cell {
   text-align: center;
   padding: 40px 16px !important;
@@ -3203,6 +3221,25 @@ textarea.ai-panel-input { resize: vertical; line-height: 1.6; }
 }
 
 .summary-sep { color: var(--text-3); }
+
+.alert {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.alert-success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
 
 /* Modal */
 .modal-overlay {
