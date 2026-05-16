@@ -30,6 +30,17 @@ const initialFormData: Omit<Customer, "customer_id" | "created_at" | "updated_at
   source: "主动录入",
   investment_staff: "",
   stage: "初步接触",
+  // 承租信息
+  current_location: "",
+  rental_area: undefined,
+  lease_start: "",
+  lease_end: "",
+  rental_status: undefined,
+  // 联系人
+  contact_name: "",
+  contact_title: "",
+  contact_phone: "",
+  contact_wechat: "",
 };
 
 export default function CustomerForm({ customerId, initialData, onSave, onCancel }: CustomerFormProps) {
@@ -76,7 +87,7 @@ export default function CustomerForm({ customerId, initialData, onSave, onCancel
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === "employee_count" || name === "required_area"
+      [name]: name === "employee_count" || name === "required_area" || name === "rental_area"
         ? value ? Number(value) : undefined
         : value,
     }));
@@ -414,6 +425,125 @@ export default function CustomerForm({ customerId, initialData, onSave, onCancel
                   <option value="签约入驻">签约入驻</option>
                 </select>
                 {errors.stage && <span className="error-text">{errors.stage}</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2 className="form-section-title">承租信息</h2>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="current_location">当前承租载体</label>
+                <input
+                  type="text"
+                  id="current_location"
+                  name="current_location"
+                  value={formData.current_location ?? ""}
+                  onChange={handleChange}
+                  placeholder="请输入当前承租载体"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="rental_area">承租面积(平方米)</label>
+                <input
+                  type="number"
+                  id="rental_area"
+                  name="rental_area"
+                  value={formData.rental_area ?? ""}
+                  onChange={handleChange}
+                  min="0"
+                  placeholder="请输入承租面积"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="lease_start">租期开始</label>
+                <input
+                  type="date"
+                  id="lease_start"
+                  name="lease_start"
+                  value={formData.lease_start ?? ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="lease_end">租期结束</label>
+                <input
+                  type="date"
+                  id="lease_end"
+                  name="lease_end"
+                  value={formData.lease_end ?? ""}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="rental_status">租金状态</label>
+                <select
+                  id="rental_status"
+                  name="rental_status"
+                  value={formData.rental_status ?? ""}
+                  onChange={handleChange}
+                >
+                  <option value="">请选择租金状态</option>
+                  <option value="正常">正常</option>
+                  <option value="欠租">欠租</option>
+                  <option value="已退">已退</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2 className="form-section-title">联系人</h2>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="contact_name">联系人姓名</label>
+                <input
+                  type="text"
+                  id="contact_name"
+                  name="contact_name"
+                  value={formData.contact_name ?? ""}
+                  onChange={handleChange}
+                  placeholder="请输入联系人姓名"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="contact_title">职务</label>
+                <input
+                  type="text"
+                  id="contact_title"
+                  name="contact_title"
+                  value={formData.contact_title ?? ""}
+                  onChange={handleChange}
+                  placeholder="请输入职务"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="contact_phone">联系电话</label>
+                <input
+                  type="text"
+                  id="contact_phone"
+                  name="contact_phone"
+                  value={formData.contact_phone ?? ""}
+                  onChange={handleChange}
+                  placeholder="请输入联系电话"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="contact_wechat">微信</label>
+                <input
+                  type="text"
+                  id="contact_wechat"
+                  name="contact_wechat"
+                  value={formData.contact_wechat ?? ""}
+                  onChange={handleChange}
+                  placeholder="请输入微信"
+                />
               </div>
             </div>
           </div>
