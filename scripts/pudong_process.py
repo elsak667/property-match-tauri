@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 """
 浦易达政策整理脚本 - JSON → Excel
-读取抓取输出的 JSON，生成精简 Excel（15字段）
+读取抓取输出的 JSON，生成精简 Excel
 
-字段：
-  id, policyName, r2212SpecialCategoryName,
-  policyObject, policyCondition, policyContent,
-  claimMethod, maxPaymentAmount, paymentStandard,
-  leadDepartment, contactInfo,
-  declarStartTime, declarEndTime,
-  zcReleaseTime
+字段映射（与飞书表格列顺序一致）：
+  id                    → id
+  policyName            → title
+  r2212SpecialCategoryName → r2212SpecialCategoryName
+  policyObject          → content.support
+  policyCondition       → content.conditions
+  policyContent        → content.content
+  paymentStandard       → content.process
+  contactInfo          → content.policyConsult
+  claimMethod          → r2509ApplyType
+  amount               → r2509MaxAmount
+  applicableRegion     → r2509Area
+  leadDepartment       → content.otherConsult
+  start                → declareStartTime
+  end                  → declareEndTime
+  zcReleaseTime        → publishTime
 
 用法：
-  python pudong_process.py                          # 默认处理 /tmp/pudong_policies_full.json
-  python pudong_process.py -i /path/to/input.json   # 指定输入
-  python pudong_process.py -o /path/to/output.xlsx  # 指定输出
+  python pudong_process.py -i data/pudong_policies.json
+  python pudong_process.py -i data/pudong_policies.json -o /path/to/output.xlsx
 """
 import argparse
 import json
@@ -61,22 +69,48 @@ def format_datetime(val):
     return val[:10] if len(val) >= 10 else val
 
 
-FIELDS = [
+# Excel 列名（与飞书表格列顺序一致）
+EXCEL_FIELDS = [
     "id",
     "policyName",
     "r2212SpecialCategoryName",
     "policyObject",
     "policyCondition",
     "policyContent",
-    "claimMethod",
-    "maxPaymentAmount",
     "paymentStandard",
-    "leadDepartment",
     "contactInfo",
-    "declarStartTime",
-    "declarEndTime",
+    "claimMethod",
+    "amount",
+    "applicableRegion",
+    "leadDepartment",
+    "start",
+    "end",
     "zcReleaseTime",
 ]
+
+
+def get_field(item: dict, excel_field: str):
+    """根据 Excel 字段名从 item 中取值的映射函数"""
+    content = item.get("content", {})
+
+    mapping = {
+        "id": item.get("id", ""),
+        "policyName": item.get("title", "") or item.get("policyName", ""),
+        "r2212SpecialCategoryName": item.get("r2212SpecialCategoryName", ""),
+        "policyObject": clean_text(content.get("support", "")),
+        "policyCondition": clean_text(content.get("conditions", "")),
+        "policyContent": clean_text(content.get("content", "")),
+        "paymentStandard": clean_text(content.get("process", "")),
+        "contactInfo": clean_text(content.get("policyConsult", "")),
+        "claimMethod": item.get("r2509ApplyType", ""),
+        "amount": item.get("r2509MaxAmount", ""),
+        "applicableRegion": item.get("r2509Area", ""),
+        "leadDepartment": clean_text(content.get("otherConsult", "")) or item.get("leadDeptName", ""),
+        "start": format_datetime(item.get("declareStartTime", "")),
+        "end": format_datetime(item.get("declareEndTime", "")),
+        "zcReleaseTime": format_datetime(item.get("publishTime", "")),
+    }
+    return mapping.get(excel_field, "")
 
 
 def main():
@@ -89,25 +123,10 @@ def main():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Sheet"
-    ws.append(FIELDS)
+    ws.append(EXCEL_FIELDS)
 
     for i, item in enumerate(data, 1):
-        row = []
-        for field in FIELDS:
-            val = item.get(field, "")
-
-            # 特殊字段格式化
-            if field in ("declarStartTime", "declarEndTime", "zcReleaseTime"):
-                val = format_datetime(val)
-            elif field in ("policyObject", "policyCondition", "policyContent",
-                           "paymentStandard", "claimMethod", "contactInfo",
-                           "maxPaymentAmount"):
-                val = clean_text(val)
-            elif field == "leadDepartment":
-                val = val or item.get("leadDeptName", "")
-
-            row.append(val)
-
+        row = [get_field(item, field) for field in EXCEL_FIELDS]
         ws.append(row)
 
         if i % 50 == 0:

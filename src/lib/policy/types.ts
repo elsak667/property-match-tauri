@@ -133,3 +133,115 @@ export interface RawIndustry {
   special: string | null;
   remark: string | null;
 }
+
+// ── 政策条件结构化类型 ────────────────────────────────────────────────────
+
+export interface PolicyCondition {
+  registerCapital?: {
+    min?: number;
+    max?: number;
+    unit?: '万' | '亿';
+    currency?: '人民币' | '美元' | '欧元';
+  };
+
+  industry?: {
+    required?: string[];
+    preferred?: string[];
+    excluded?: string[];
+  };
+
+  region?: {
+    province?: string;
+    city?: string;
+    district?: string;
+    taxLocation?: string;
+  };
+
+  establishmentYear?: {
+    min?: number;
+    max?: number;
+  };
+
+  employeeCount?: {
+    min?: number;
+    max?: number;
+  };
+
+  annualRevenue?: {
+    min?: number;
+    max?: number;
+    unit?: '万' | '亿';
+  };
+
+  taxAmount?: {
+    min?: number;
+    location?: string;
+  };
+
+  qualifications?: {
+    required?: string[];
+    preferred?: string[];
+  };
+
+  creditRecord?: {
+    required?: boolean;
+  };
+
+  rdExpenditure?: {
+    minRatio?: number;
+    minAmount?: number;
+  };
+
+  intellectualProperty?: {
+    patents?: { min?: number };
+    softwareCopyright?: { min?: number };
+  };
+
+  environmental?: {
+    hasEIA?: boolean;
+    hasDischargePermit?: boolean;
+  };
+
+  safety?: {
+    hasProductionLicense?: boolean;
+  };
+
+  importExport?: {
+    hasImportExportRights?: boolean;
+  };
+
+  enterpriseType?: {
+    allowed?: string[];
+    excluded?: string[];
+    required?: string[];
+  };
+
+  listedStatus?: {
+    allowed?: ('上市' | '非上市' | '新三板' | '科创板')[];
+  };
+
+  projectInvestment?: {
+    min?: number;
+    unit?: '万' | '亿';
+  };
+
+  landArea?: {
+    min?: number;
+    buildingArea?: { min?: number; max?: number };
+  };
+
+  applicationMethod?: string;
+
+  specialConditions?: string[];
+  rawText?: string;
+  extractionStatus: 'pending' | 'completed' | 'failed';
+  extractedAt?: string;
+}
+
+// 精准匹配结果
+export interface PrecisionMatch {
+  matched: boolean;
+  matchedConditions: string[];
+  unmatchedConditions: string[];
+  overallReason: string;
+}

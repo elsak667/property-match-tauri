@@ -16,10 +16,17 @@ interface Env {
   PROPERTY_UNIT_SHEET_ID: string;
   PROPERTY_INDUSTRY_SHEET_ID: string;
   AI_ACCOUNT_ID: string;
+  CLUE_SHEET: string;
+  CLUE_SHEET_ID: string;
+  CUSTOMER_SHEET: string;
+  CUSTOMER_SHEET_ID: string;
+  VISIT_SHEET: string;
+  VISIT_SHEET_ID: string;
 }
 
 const TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
 const SHEET_URL = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets";
+const BITABLE_URL = "https://open.feishu.cn/open-apis/bitable/v1/apps";
 
 const CACHE: Map<string, { token: string; expires: number }> = new Map();
 
@@ -58,6 +65,87 @@ async function fetchSheet(
   };
   if (data.code !== 0) throw new Error(`Sheet error ${data.code}: ${data.msg}`);
   return data.data?.valueRange?.values ?? [];
+}
+
+// Bitable API helpers
+async function bitableGetRecords(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  pageSize = 100,
+  pageToken?: string,
+): Promise<{ items: Record<string, unknown>[]; hasMore: boolean; pageToken?: string }> {
+  const token = await getToken(env);
+  let url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records?page_size=${pageSize}`;
+  if (pageToken) url += `&page_token=${pageToken}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  const data = await res.json() as {
+    code: number; msg?: string;
+    data?: { items?: Record<string, unknown>[]; has_more?: boolean; page_token?: string };
+  };
+  if (data.code !== 0) throw new Error(`Bitable get error ${data.code}: ${data.msg}`);
+  return {
+    items: data.data?.items ?? [],
+    hasMore: data.data?.has_more ?? false,
+    pageToken: data.data?.page_token,
+  };
+}
+
+async function bitableCreateRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  fields: Record<string, unknown>,
+): Promise<{ record_id: string; fields: Record<string, unknown> }> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json() as {
+    code: number; msg?: string;
+    data?: { record?: { record_id: string; fields: Record<string, unknown> } };
+  };
+  if (data.code !== 0) throw new Error(`Bitable create error ${data.code}: ${data.msg}`);
+  return { record_id: data.data?.record?.record_id ?? "", fields: data.data?.record?.fields ?? {} };
+}
+
+async function bitableUpdateRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  recordId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records/${recordId}`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json() as { code: number; msg?: string };
+  if (data.code !== 0) throw new Error(`Bitable update error ${data.code}: ${data.msg}`);
+}
+
+async function bitableDeleteRecord(
+  env: Env,
+  appToken: string,
+  tableId: string,
+  recordId: string,
+): Promise<void> {
+  const token = await getToken(env);
+  const url = `${BITABLE_URL}/${appToken}/tables/${tableId}/records/${recordId}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  const data = await res.json() as { code: number; msg?: string };
+  if (data.code !== 0) throw new Error(`Bitable delete error ${data.code}: ${data.msg}`);
 }
 
 function json(body: unknown, status = 200): Response {
@@ -204,6 +292,18 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return handleAiQuery(q, env);
     }
 
+    // /api/enterprise/search?name=企业名称
+    if (path === "/api/enterprise/search" && request.method === "GET") {
+      const name = url.searchParams.get("name") || "";
+      // TODO: 替换为天眼查 API，目前返回空（Mock 阶段）
+      return json({ list: [], total: 0, mock: true });
+    }
+
+    // /api/policy/match-precise（待实现）
+    if (path === "/api/policy/match-precise" && request.method === "POST") {
+      return json({ error: "Not yet implemented" }, 501);
+    }
+
     // /api/properties?type=园区|楼宇|单元|产业字典
     if (path === "/api/properties" && request.method === "GET") {
       const type = url.searchParams.get("type") || "单元";
@@ -228,6 +328,170 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
       return json(items);
     }
 
+    // ===== 线索管理 API (Bitable) =====
+    // CLUE_SHEET = app_token, CLUE_SHEET_ID = table_id
+    const clueAppToken = env.CLUE_SHEET;
+    const clueTableId = env.CLUE_SHEET_ID;
+    if (!clueAppToken || !clueTableId) {
+      // Don't block other APIs if clue not configured
+    } else if (path === "/api/invest-api/clues" && request.method === "GET") {
+      // 获取线索列表
+      const result = await bitableGetRecords(env, clueAppToken, clueTableId, 100);
+      return json({ data: result.items, hasMore: result.hasMore, pageToken: result.pageToken });
+    } else if (path === "/api/invest-api/clues" && request.method === "POST") {
+      // 提交新线索
+      const body = await request.json() as Record<string, unknown>;
+      const { record_id, fields } = await bitableCreateRecord(env, clueAppToken, clueTableId, body as Record<string, unknown>);
+      return json({ record_id, fields }, 201);
+    } else if (path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/) && request.method === "POST") {
+      // 线索转客户
+      const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)\/convert$/);
+      if (!clueIdMatch || !clueAppToken || !clueTableId) return json({ error: "Not found" }, 404);
+      const clueRecordId = clueIdMatch[1];
+
+      // Fetch clue record
+      const allClues = await bitableGetRecords(env, clueAppToken, clueTableId, 500);
+      const clue = allClues.items.find((r: Record<string, unknown>) => String(r.record_id) === clueRecordId);
+      if (!clue) return json({ error: "Clue not found" }, 404);
+
+      // Validate status is "跟进中" before converting
+      const currentStatus = String(clue.status ?? "");
+      if (currentStatus !== "跟进中") {
+        return json({ error: `只能转化"跟进中"状态的线索，当前状态：${currentStatus}` }, 400);
+      }
+
+      // Build customer fields from clue (filter empty values)
+      const customerFields: Record<string, unknown> = {};
+      const fieldMap: Record<string, string> = {
+        company_name: "name",
+        contact_name: "contact_name",
+        contact_phone: "contact_phone",
+        required_area: "required_area",
+        preferred_district: "preferred_district",
+        investment_staff: "investment_staff",
+      };
+      for (const [src, dst] of Object.entries(fieldMap)) {
+        const val = clue[src];
+        if (val !== "" && val != null) customerFields[dst] = val;
+      }
+      customerFields.source = "载体转化";
+      customerFields.stage = "初步接触";
+
+      // Create customer record
+      if (!env.CUSTOMER_SHEET || !env.CUSTOMER_SHEET_ID) {
+        return json({ error: "Customer sheet not configured" }, 500);
+      }
+      const customerResult = await bitableCreateRecord(
+        env,
+        env.CUSTOMER_SHEET,
+        env.CUSTOMER_SHEET_ID,
+        customerFields,
+      );
+
+      // Update clue status to "已转化"
+      await bitableUpdateRecord(env, clueAppToken, clueTableId, clueRecordId, { status: "已转化" });
+
+      return json({ success: true, customer_id: customerResult.record_id });
+    } else {
+      // GET/PUT /api/invest-api/clues/:id
+      const clueIdMatch = path.match(/^\/api\/invest-api\/clues\/([^/]+)$/);
+      if (clueIdMatch && clueAppToken && clueTableId) {
+        const recordId = clueIdMatch[1];
+        if (request.method === "GET") {
+          // 获取线索详情 — 先拉列表找到 record
+          const result = await bitableGetRecords(env, clueAppToken, clueTableId, 500);
+          const item = result.items.find((r: Record<string, unknown>) => String(r.record_id) === recordId);
+          if (!item) return json({ error: "Clue not found" }, 404);
+          return json(item);
+        }
+        if (request.method === "PUT") {
+          // 更新线索
+          const body = await request.json() as Record<string, unknown>;
+          await bitableUpdateRecord(env, clueAppToken, clueTableId, recordId, body as Record<string, unknown>);
+          return json({ success: true });
+        }
+        if (request.method === "DELETE") {
+          // 删除线索
+          await bitableDeleteRecord(env, clueAppToken, clueTableId, recordId);
+          return json({ success: true });
+        }
+      }
+    }
+
+    // ===== 客户管理 API (Bitable) =====
+    const customerAppToken = env.CUSTOMER_SHEET;
+    const customerTableId = env.CUSTOMER_SHEET_ID;
+    if (!customerAppToken || !customerTableId) {
+      // Don't block other APIs if customer not configured
+    } else if (path === "/api/invest-api/customers" && request.method === "GET") {
+      const result = await bitableGetRecords(env, customerAppToken, customerTableId, 100);
+      return json({ data: result.items, hasMore: result.hasMore, pageToken: result.pageToken });
+    } else if (path === "/api/invest-api/customers" && request.method === "POST") {
+      const body = await request.json() as Record<string, unknown>;
+      const { record_id, fields } = await bitableCreateRecord(env, customerAppToken, customerTableId, body as Record<string, unknown>);
+      return json({ record_id, fields }, 201);
+    } else {
+      const customerIdMatch = path.match(/^\/api\/invest-api\/customers\/([^/]+)$/);
+      if (customerIdMatch && customerAppToken && customerTableId) {
+        const recordId = customerIdMatch[1];
+        if (request.method === "GET") {
+          const result = await bitableGetRecords(env, customerAppToken, customerTableId, 500);
+          const item = result.items.find((r: Record<string, unknown>) => String(r.record_id) === recordId);
+          if (!item) return json({ error: "Customer not found" }, 404);
+          return json(item);
+        }
+        if (request.method === "PUT") {
+          const body = await request.json() as Record<string, unknown>;
+          await bitableUpdateRecord(env, customerAppToken, customerTableId, recordId, body as Record<string, unknown>);
+          return json({ success: true });
+        }
+        if (request.method === "DELETE") {
+          await bitableDeleteRecord(env, customerAppToken, customerTableId, recordId);
+          return json({ success: true });
+        }
+      } else if (path === "/api/invest-api/customers/batch" && request.method === "POST") {
+        const { customers } = await request.json() as { customers: Record<string, unknown>[] };
+        const result = { success: 0, failed: 0, errors: [] as string[] };
+        for (const customer of customers) {
+          try {
+            await bitableCreateRecord(env, customerAppToken, customerTableId, customer);
+            result.success++;
+          } catch (err: unknown) {
+            result.failed++;
+            result.errors.push(`${(customer.name || "未知")}: ${(err as Error).message}`);
+          }
+        }
+        return json(result);
+      }
+    }
+
+    // ===== 跟进记录 API (Bitable) =====
+    const visitAppToken = env.VISIT_SHEET;
+    const visitTableId = env.VISIT_SHEET_ID;
+    if (visitAppToken && visitTableId) {
+      const visitMatch = path.match(/^\/api\/invest-api\/customers\/([^/]+)\/visits$/);
+      if (visitMatch) {
+        const customerId = visitMatch[1];
+        if (request.method === "GET") {
+          const result = await bitableGetRecords(env, visitAppToken, visitTableId, 100);
+          // Filter to this customer, newest first
+          const items = result.items
+            .filter((r) => String(r.customer_id) === customerId)
+            .sort((a, b) => {
+              const da = new Date(a.visit_date || 0).getTime();
+              const db = new Date(b.visit_date || 0).getTime();
+              return db - da;
+            });
+          return json({ data: items, hasMore: result.hasMore, pageToken: result.pageToken });
+        }
+        if (request.method === "POST") {
+          const body = await request.json() as Record<string, unknown>;
+          const { record_id, fields } = await bitableCreateRecord(env, visitAppToken, visitTableId, body as Record<string, unknown>);
+          return json({ record_id, fields }, 201);
+        }
+      }
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err: unknown) {
     return json({ error: (err as Error).message }, 500);
@@ -240,7 +504,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
         },
       });
