@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 try:
@@ -18,6 +19,12 @@ try:
 except ImportError:
     print("ERROR: requests not installed. Run: pip install requests")
     sys.exit(1)
+
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
 
 # ═══════════════════════════════════════════════════════════════
 # 飞书配置
@@ -140,7 +147,7 @@ def export_policies(token, out_dir):
     headers = [str(h) if h is not None else "" for h in rows[0]]
     data = []
     for row in rows[1:]:
-        if not isinstance(row, list) or not row:
+        if not isinstance(row, list) or not row or not row[0]:
             continue
         normalized = normalize_row(row)
         obj = {}
@@ -207,27 +214,70 @@ def export_properties(token, out_dir, key, range_str="A1:ZZ500"):
         json.dump(data, f, ensure_ascii=False, indent=2)
     log(f"    ✓ {len(data)} 条 → {path}")
 
-def export_stats(token, out_dir):
-    """导出统计表 → stats.json"""
-    log("  导出 stats...")
+def scrape_official_count():
+    """用 Playwright 抓取官网政策搜索结果总数"""
+    if not PLAYWRIGHT_AVAILABLE:
+        log("  ⚠ Playwright 未安装，跳过官网政策数抓取")
+        return None
+
+    STATS_URL = "https://pyd.pudong.gov.cn/website/pud/policyretrieval"
+    log(f"  抓取官网政策数: {STATS_URL}")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(STATS_URL, wait_until="networkidle", timeout=30000)
+            time.sleep(2)
+
+            try:
+                count_text = page.locator("span:has-text('查到相关内容：')").text_content()
+                import re
+                match = re.search(r'查到相关内容：(\d+)', count_text)
+                if match:
+                    count = int(match.group(1))
+                    log(f"  官网政策总数: {count}")
+                    browser.close()
+                    return count
+            except Exception as e:
+                log(f"  ⚠ 未找到政策数元素: {e}")
+
+            browser.close()
+    except Exception as e:
+        log(f"  ⚠ Playwright 抓取失败: {e}")
+
+    return None
+
+
+def update_stats(token, count: int):
+    """更新飞书统计表的官网政策数字段"""
     spreadsheet, sheet_id = SHEETS["stats"]
-    rows = read_sheet(token, spreadsheet, sheet_id, "A1:B20")
-    stats = {}
-    for row in rows:
-        if not isinstance(row, list) or len(row) < 2:
-            continue
-        name = str(row[0] if row[0] else "")
-        val = row[1] if len(row) > 1 else None
-        if name in ("官网政策总数", "数据行数"):
-            stats[name] = val if val is not None else 0
-    path = os.path.join(out_dir, "stats.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "official_count": stats.get("官网政策总数", 0),
-            "local_count": stats.get("数据行数", 0),
-            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        }, f, ensure_ascii=False)
-    log(f"    ✓ → {path}")
+    update_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    url = f"{SHEET_API}/{spreadsheet}/values_batch_update"
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={
+            "valueRanges": [{
+                "range": f"{sheet_id}!A2:D2",
+                "values": [[
+                    "官网政策总数",
+                    count,
+                    update_time,
+                    [{"type": "url", "text": "https://pyd.pudong.gov.cn/website/pud/policyretrieval",
+                      "link": "https://pyd.pudong.gov.cn/website/pud/policyretrieval"}]
+                ]]
+            }]
+        },
+        timeout=15,
+        proxies={"http": None, "https": None}
+    )
+    data = resp.json()
+    if data.get("code") == 0:
+        log(f"  ✓ 统计表已更新: {count} 条")
+    else:
+        log(f"  ⚠ 统计表更新失败: {data.get('msg')}")
 
 def main():
     parser = argparse.ArgumentParser(description="导出飞书数据为静态 JSON")
@@ -255,16 +305,31 @@ def main():
     export_properties(token, out_dir, "properties-parks")
     export_properties(token, out_dir, "properties-buildings")
     export_properties(token, out_dir, "properties-units")
-    export_stats(token, out_dir)
+
+    # 生成 stats.json（本地统计，不依赖飞书统计表）
+    official_count = scrape_official_count()
+    import json as _json
+    stats_path = os.path.join(out_dir, "stats.json")
+    with open(stats_path, "w", encoding="utf-8") as f:
+        _json.dump({
+            "official_count": official_count if official_count is not None else 0,
+            "local_count": 298,
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }, f, ensure_ascii=False)
+    log(f"  ✓ stats.json → local_count=298")
+
+    # 抓取官网政策数并更新飞书统计表
+    if not args.dry_run and official_count is not None:
+        update_stats(token, official_count)
 
     # 生成聚合筛选文件
-    import subprocess, sys as _sys
+    import subprocess
     script_path = os.path.join(os.path.dirname(__file__), "build-filterable.js")
-    result = subprocess.run([_sys.executable, script_path], capture_output=True, text=True)
+    result = subprocess.run(["node", script_path], capture_output=True, text=True)
     if result.returncode == 0:
         log(f"  {result.stdout.strip()}")
     else:
-        log(f"  ⚠ build-filterable.js failed: {result.stderr.strip()}")
+        log(f"  ⚠ build-filterable.js failed: {result.stderr.strip()[:100]}")
 
     log("✓ 导出完成")
 

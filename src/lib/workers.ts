@@ -8,13 +8,18 @@ const USE_WORKERS = import.meta.env.VITE_USE_WORKERS === "true";
 const WORKERS_BASE = "https://api.198857.sbs/api";
 const STATIC_BASE = "/data";
 
-async function request<T>(path: string, timeoutMs = 15000): Promise<T> {
+async function request<T>(
+  path: string,
+  timeoutMs = 15000,
+  options?: RequestInit
+): Promise<T> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${WORKERS_BASE}${path}`, {
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
+      ...options,
     });
     clearTimeout(id);
     if (!res.ok) {
@@ -272,4 +277,45 @@ export async function getWorkersPolicyStatsFromStatic(): Promise<PolicyStats> {
   } catch {
     return request<PolicyStats>("/property-stats");
   }
+}
+
+// ── 政策精准匹配 ───────────────────────────────────────────────────────────
+export interface EnterpriseProfile {
+  name?: string;
+  registeredCapital?: number;
+  establishmentDate?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  employeeCount?: number;
+  industry?: string[];
+  annualRevenue?: number;
+  taxLocation?: string;
+  qualifications?: string[];
+  creditRating?: string;
+  patents?: number;
+  softwareCopyright?: number;
+  hasEIA?: boolean;
+  hasDischargePermit?: boolean;
+  hasProductionLicense?: boolean;
+  hasImportExportRights?: boolean;
+  enterpriseType?: string[];
+  listedStatus?: string;
+  supplementaryNote?: string;
+}
+
+export interface PolicyMatchResult {
+  policy_id: string;
+  policy_name: string;
+  matched: boolean;
+  matchedConditions: string[];
+  unmatchedConditions: string[];
+  overallReason: string;
+}
+
+export async function matchPolicyPrecise(enterprise: EnterpriseProfile): Promise<{ matches: PolicyMatchResult[] }> {
+  return request<{ matches: PolicyMatchResult[] }>("/policy/match-precise", 30000, {
+    method: "POST",
+    body: JSON.stringify({ enterprise }),
+  });
 }

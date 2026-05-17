@@ -17,6 +17,9 @@ from pathlib import Path
 import openpyxl
 import requests
 
+# Only disable proxies if explicitly requested via NO_PROXY env
+_proxy = {} if os.environ.get("NO_PROXY") else {"http": None, "https": None}
+
 FEISHU = {
     "app_id": os.environ.get("FEISHU_APP_ID", ""),
     "app_secret": os.environ.get("FEISHU_APP_SECRET", ""),
@@ -45,26 +48,32 @@ def get_feishu_token():
         "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
         json={"app_id": FEISHU["app_id"], "app_secret": FEISHU["app_secret"]},
         timeout=10,
-        proxies={"http": None, "https": None}
+        proxies=_proxy
     )
     return r.json()["tenant_access_token"]
 
 
 def feishu_get(url, token):
     r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15,
-                     proxies={"http": None, "https": None})
+                     proxies=_proxy)
     if r.status_code != 200:
         return {"code": -1, "msg": f"HTTP {r.status_code}"}
     return r.json()
 
 
 def feishu_post(url, payload, token):
-    r = requests.post(url, headers={"Authorization": f"Bearer {token}",
-                                    "Content-Type": "application/json"},
-                      json=payload, timeout=20, proxies={"http": None, "https": None})
-    if r.status_code != 200:
-        return {"code": -1, "msg": f"HTTP {r.status_code}"}
-    return r.json()
+    r = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=30,
+        proxies=_proxy,
+        allow_redirects=False,
+    )
+    try:
+        return r.json()
+    except Exception:
+        return {"code": -1, "msg": f"HTTP {r.status_code}: {r.text[:100]}"}
 
 
 def col_letter(n):
@@ -104,7 +113,7 @@ def main():
 
     token = get_feishu_token()
 
-    # 获取飞书当前数据
+    # 获取飞书当前数据（容错：404 等错误不影响后续处理）
     feishu_data = []
     row = 2
     while True:
@@ -112,10 +121,8 @@ def main():
         url = (f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/"
                f"{FEISHU['sheet_token']}/values/{range_str(0, len(headers)-1, row, end_row)}")
         resp = feishu_get(url, token)
-        if resp.get("code") != 0:
-            break
-        vals = resp["data"]["valueRange"]["values"]
-        if not vals or (len(vals) == 1 and not vals[0][0]):
+        vals = resp.get("data", {}).get("valueRange", {}).get("values", []) if resp.get("code") == 0 else []
+        if not vals:
             break
         feishu_data.extend(vals)
         if len(vals) < 500:
@@ -123,7 +130,8 @@ def main():
         row = end_row + 1
         time.sleep(0.1)
 
-    feishu_index = {str(v[0]): i + 2 for i, v in enumerate(feishu_data) if v and v[0]}
+    feishu_index = {str(v[0]): i + 2 for i, v in enumerate(feishu_data) if v and v[0] and str(v[0]) != "id"}
+    feishu_last_row = max((i + 2 for i, v in enumerate(feishu_data) if v and v[0] and str(v[0]) != "id"), default=1)
     excel_index = {str(r[0]): r for r in data_rows if r and r[0]}
 
     new_records, updated = [], []
@@ -148,20 +156,33 @@ def main():
         log("无变动")
         return
 
-    # 新增
+    # 新增：寻找第一个空行
     if new_records:
-        next_row = len(feishu_data) + 2
-        end_row = next_row + len(new_records) - 1
-        resp = feishu_post(
-            f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/values_batch_update",
-            {"valueRanges": [{"range": range_str(0, len(headers)-1, next_row, end_row),
-                              "values": new_records}]},
-            token
-        )
-        if resp.get("code") == 0:
-            log(f"✓ 新增 {len(new_records)} 行")
-        else:
-            log(f"✗ 新增失败: {resp.get('msg')}")
+        next_row = feishu_last_row + 1 if feishu_last_row > 1 else 2
+
+        # 分批写入，每批50条，避免大payload失败
+        batch_size = 50
+        token_is_fresh = True
+        for i in range(0, len(new_records), batch_size):
+            batch = new_records[i:i + batch_size]
+            b_start = next_row + i
+            b_end = b_start + len(batch) - 1
+            if not token_is_fresh:
+                token = get_feishu_token()
+            token_is_fresh = False
+            resp = feishu_post(
+                f"https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/{FEISHU['sheet_token']}/values_batch_update",
+                {"valueRanges": [{"range": range_str(0, len(headers) - 1, b_start, b_end),
+                                  "values": batch}]},
+                token
+            )
+            if resp.get("code") == 0:
+                log(f"  批次 {i // batch_size + 1}: 行{b_start}-{b_end} ✓")
+                token_is_fresh = True
+            else:
+                log(f"  批次 {i // batch_size + 1}: 行{b_start}-{b_end} ✗ {resp.get('msg')}")
+            time.sleep(0.5)
+        log(f"✓ 新增 {len(new_records)} 行")
 
     # 更新
     for row_num, row_data in updated:

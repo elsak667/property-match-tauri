@@ -6,6 +6,7 @@ import { openPrintHtmlRaw } from "../lib/pdfgen_new";
 import BuildingDetailPanel from "./BuildingDetailPanel";
 import { Icon } from "./Icons";
 import { trackEvent, trackExport, trackClick } from "../lib/track";
+import { matchPolicyPrecise, type EnterpriseProfile, type PolicyMatchResult } from "../lib/workers";
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 interface AiPolicyMatch {
@@ -31,6 +32,7 @@ interface AiSearchResult {
 }
 
 type AiState = "greeting" | "collecting" | "searching" | "result" | "rating";
+type AiMode = "dialog" | "form";
 
 interface Prefs {
   area?: string;
@@ -155,6 +157,7 @@ interface Props {
 
 export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAiBuildingClick, standalone, autoOpen, inLauncher }: Props) {
   const [state, setState] = useState<AiState>("greeting");
+  const [mode, setMode] = useState<AiMode>("dialog");
   const [baseQuery, setBaseQuery] = useState("");           // 原始需求
   const [prefs, setPrefs] = useState<Prefs>({});            // 收集的偏好
   const [currentPrefKey, setCurrentPrefKey] = useState<string | null>(null); // 当前追问的问题 key
@@ -170,6 +173,20 @@ export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAi
   const [open, setOpen] = useState(autoOpen ?? false);
   const activeBuildingId = aiActiveBuildingId ?? null;
   const sessionId = getSessionId();
+
+  // 精准匹配表单状态
+  const [formData, setFormData] = useState({
+    name: "",
+    employeeCount: "",
+    registeredCapital: "",
+    district: "",
+    industry: [] as string[],
+    qualifications: [] as string[],
+    supplementaryNote: "",
+  });
+  const [formResult, setFormResult] = useState<PolicyMatchResult[] | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState("");
 
   // 点击外部关闭
   useEffect(() => {
@@ -291,6 +308,55 @@ export default function AIAssistant({ aiActiveBuildingId, onAiResultChange, onAi
     });
   };
 
+  // 精准匹配表单提交
+  const handleFormSubmit = async () => {
+    if (!formData.name.trim()) {
+      setFormError("请输入企业名称");
+      return;
+    }
+    setFormError("");
+    setFormLoading(true);
+    try {
+      const enterprise: EnterpriseProfile = {
+        name: formData.name,
+        employeeCount: formData.employeeCount ? parseInt(formData.employeeCount) : undefined,
+        registeredCapital: formData.registeredCapital ? parseInt(formData.registeredCapital) : undefined,
+        district: formData.district || undefined,
+        industry: formData.industry.length > 0 ? formData.industry : undefined,
+        qualifications: formData.qualifications.length > 0 ? formData.qualifications : undefined,
+        supplementaryNote: formData.supplementaryNote || undefined,
+      };
+      const res = await matchPolicyPrecise(enterprise);
+      setFormResult(res.matches);
+    } catch (e: unknown) {
+      setFormError((e as Error).message);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleFormChange = (field: keyof typeof formData, value: unknown) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFormIndustry = (ind: string) => {
+    setFormData(prev => ({
+      ...prev,
+      industry: prev.industry.includes(ind)
+        ? prev.industry.filter(i => i !== ind)
+        : [...prev.industry, ind],
+    }));
+  };
+
+  const toggleFormQual = (q: string) => {
+    setFormData(prev => ({
+      ...prev,
+      qualifications: prev.qualifications.includes(q)
+        ? prev.qualifications.filter(q2 => q2 !== q)
+        : [...prev.qualifications, q],
+    }));
+  };
+
   // 导出
   const handleExport = () => {
     if (!result) return;
@@ -366,8 +432,88 @@ ${propTable}
             </div>
           )}
 
+          {/* 模式切换 */}
+          <div className="ai-mode-tabs">
+            <button className={`ai-mode-tab${mode === "dialog" ? " active" : ""}`} onClick={() => setMode("dialog")}>对话模式</button>
+            <button className={`ai-mode-tab${mode === "form" ? " active" : ""}`} onClick={() => setMode("form")}>精准匹配</button>
+          </div>
+
+          {/* 精准匹配表单 */}
+          {mode === "form" && (
+            <div className="ai-form-mode">
+              {formError && <div className="ai-panel-error"><Icon.alertAccent /> {formError}</div>}
+              <div className="ai-form-field">
+                <label>企业名称 *</label>
+                <input type="text" placeholder="输入企业名称" value={formData.name} onChange={e => handleFormChange("name", e.target.value)} />
+              </div>
+              <div className="ai-form-field">
+                <label>员工人数</label>
+                <input type="number" placeholder="如：50" value={formData.employeeCount} onChange={e => handleFormChange("employeeCount", e.target.value)} />
+              </div>
+              <div className="ai-form-field">
+                <label>注册资金（万）</label>
+                <input type="number" placeholder="如：500" value={formData.registeredCapital} onChange={e => handleFormChange("registeredCapital", e.target.value)} />
+              </div>
+              <div className="ai-form-field">
+                <label>所在区域</label>
+                <select value={formData.district} onChange={e => handleFormChange("district", e.target.value)}>
+                  <option value="">请选择</option>
+                  <option value="浦东新区">浦东新区</option>
+                  <option value="临港新片区">临港新片区</option>
+                </select>
+              </div>
+              <div className="ai-form-field">
+                <label>行业方向</label>
+                <div className="ai-form-tags">
+                  {["人工智能","生物医药","集成电路","新能源","智能制造","软件和信息技术服务业"].map(ind => (
+                    <button key={ind} className={`ai-form-tag${formData.industry.includes(ind) ? " active" : ""}`} onClick={() => toggleFormIndustry(ind)}>{ind}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="ai-form-field">
+                <label>已获资质</label>
+                <div className="ai-form-tags">
+                  {["高新技术企业","专精特新","瞪羚企业","AEO认证"].map(q => (
+                    <button key={q} className={`ai-form-tag${formData.qualifications.includes(q) ? " active" : ""}`} onClick={() => toggleFormQual(q)}>{q}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="ai-form-field">
+                <label>补充说明</label>
+                <textarea placeholder="其他情况，如：我们的产品主要用于..." value={formData.supplementaryNote} onChange={e => handleFormChange("supplementaryNote", e.target.value)} rows={2} />
+              </div>
+              <button className="ai-panel-btn ai-panel-btn-primary" onClick={handleFormSubmit} disabled={formLoading || !formData.name.trim()}>
+                {formLoading ? <><Icon.loader /> 匹配中...</> : "开始匹配"}
+              </button>
+
+              {/* 表单结果 */}
+              {formResult && (
+                <div className="ai-form-result">
+                  <div className="ai-form-result-title">匹配结果（{formResult.length} 条）</div>
+                  {formResult.slice(0, 10).map((item, i) => (
+                    <div key={i} className="ai-form-result-item">
+                      <div className="ai-form-result-name">
+                        <span className={`ai-form-badge ${item.matched ? "matched" : "unmatched"}`}>
+                          {item.matched ? "✓ 满足" : "✗ 不满足"}
+                        </span>
+                        {item.policy_name}
+                      </div>
+                      <div className="ai-form-result-reason">{item.overallReason}</div>
+                      {item.matchedConditions.length > 0 && (
+                        <div className="ai-form-match-detail"><span className="green">✓ {item.matchedConditions[0]}</span></div>
+                      )}
+                      {item.unmatchedConditions.length > 0 && (
+                        <div className="ai-form-match-detail"><span className="red">✗ {item.unmatchedConditions[0]}</span></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 对话历史 */}
-          {history.length > 0 && (
+          {mode === "dialog" && history.length > 0 && (
             <div className="ai-panel-history">
               {history.map((h, i) => (
                 <div key={i} className={`ai-msg ai-msg-${h.from}`}>{h.text}</div>

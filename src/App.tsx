@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import PolicyPage from "./app/policy/PolicyPage";
 import CarrierPage from "./app/carrier/CarrierPage";
 import HomePage from "./app/home/HomePage";
@@ -20,15 +20,6 @@ export default function App() {
   const policyCount = policies.length;
   const carrierCount = properties.length;
 
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).__setPage__ = (page: string) => {
-      if (["home", "policy", "property", "customer", "placeholder-industry", "clue"].includes(page)) {
-        setCurrentPage(page as Page);
-      }
-    };
-    return () => { delete (window as unknown as Record<string, unknown>).__setPage__; };
-  }, []);
-
   return (
     <div className="app-wrapper">
       <div className="app-main anim-navbar">
@@ -36,9 +27,7 @@ export default function App() {
         <div>
           {currentPage === "home" && <HomePage policyCount={policyCount} carrierCount={carrierCount} news={news} />}
           {currentPage === "policy" && <PolicyPage />}
-          {currentPage === "property" && (
-            <CarrierPage />
-          )}
+          {currentPage === "property" && <CarrierPage />}
           {currentPage === "customer" && <CustomerPage />}
           {currentPage === "placeholder-industry" && (
             <PlaceholderPage
@@ -87,6 +76,7 @@ function NavBar({ currentPage, onNavigate }: NavBarProps) {
         ))}
       </nav>
       <div className="navbar-right">
+        <FontSizeToggle />
         <span className="navbar-badge"><Icon.zapAccent /> 内部使用</span>
       </div>
     </div>
@@ -108,5 +98,38 @@ function MobileTabBar({ currentPage, onNavigate }: NavBarProps) {
         </button>
       ))}
     </nav>
+  );
+}
+
+function FontSizeToggle() {
+  const [isEnlarged, setIsEnlarged] = useState(false);
+
+  const toggle = () => {
+    const target = document.querySelector(".app-main > div:nth-child(2)") as HTMLElement | null;
+    if (!target) return;
+
+    if (!isEnlarged) {
+      target.style.transform = "scale(1.15)";
+      target.style.transformOrigin = "top left";
+      target.style.width = "calc(100% / 1.15)";
+      localStorage.setItem("app-font-size", "lg");
+    } else {
+      target.style.transform = "";
+      target.style.transformOrigin = "";
+      target.style.width = "";
+      localStorage.setItem("app-font-size", "md");
+    }
+    setIsEnlarged(!isEnlarged);
+  };
+
+  return (
+    <button
+      className="font-size-btn"
+      onClick={toggle}
+      aria-pressed={isEnlarged}
+      title={isEnlarged ? "恢复正常字号" : "放大字号"}
+    >
+      <span style={{ fontSize: isEnlarged ? "10px" : "13px", fontWeight: 700, lineHeight: 1 }}>Aa</span>
+    </button>
   );
 }
