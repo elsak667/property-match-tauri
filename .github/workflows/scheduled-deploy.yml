@@ -43,6 +43,7 @@ jobs:
       - name: Extract policy conditions (batch)
         run: npx tsx scripts/batch-extract-conditions.ts
         shell: bash
+        continue-on-error: true
         env:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
