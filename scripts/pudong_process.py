@@ -3,9 +3,10 @@
 浦易达政策整理脚本 - JSON → Excel
 读取抓取输出的 JSON，生成精简 Excel
 
-字段映射（与飞书表格列顺序一致）：
+字段映射（原样保留浦易达字段名）：
   id                    → id
-  policyName            → title
+  name                  → name（列表显示名）
+  title                 → title（文件通知名）
   r2212SpecialCategoryName → r2212SpecialCategoryName
   policyObject          → content.support
   policyCondition       → content.conditions
@@ -15,7 +16,7 @@
   claimMethod          → r2509ApplyType
   amount               → r2509MaxAmount
   applicableRegion     → r2509Area
-  leadDepartment       → content.otherConsult
+  leadDepartment       → content.otherConsult / leadDeptName
   start                → declareStartTime
   end                  → declareEndTime
   zcReleaseTime        → publishTime
@@ -72,7 +73,8 @@ def format_datetime(val):
 # Excel 列名（与飞书表格列顺序一致）
 EXCEL_FIELDS = [
     "id",
-    "policyName",
+    "name",
+    "title",
     "r2212SpecialCategoryName",
     "policyObject",
     "policyCondition",
@@ -86,6 +88,7 @@ EXCEL_FIELDS = [
     "start",
     "end",
     "zcReleaseTime",
+    "applyStatus",
 ]
 
 
@@ -95,7 +98,8 @@ def get_field(item: dict, excel_field: str):
 
     mapping = {
         "id": item.get("id", ""),
-        "policyName": item.get("title", "") or item.get("policyName", ""),
+        "name": item.get("name", ""),
+        "title": item.get("title", ""),
         "r2212SpecialCategoryName": item.get("r2212SpecialCategoryName", ""),
         "policyObject": clean_text(content.get("support", "")),
         "policyCondition": clean_text(content.get("conditions", "")),
@@ -109,6 +113,7 @@ def get_field(item: dict, excel_field: str):
         "start": format_datetime(item.get("declareStartTime", "")),
         "end": format_datetime(item.get("declareEndTime", "")),
         "zcReleaseTime": format_datetime(item.get("publishTime", "")),
+        "applyStatus": item.get("applyStatus", ""),
     }
     return mapping.get(excel_field, "")
 

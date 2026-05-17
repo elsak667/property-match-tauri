@@ -19,6 +19,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rgnncmgrumwjjgzyhmkt.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -26,6 +27,21 @@ const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
 const MODEL = 'deepseek-ai/deepseek-v4-flash';
 const DRY_RUN = process.env.DRY_RUN === 'true';
 const RETRY_FAILED = process.env.RETRY_FAILED === 'true';
+const FAILED_FILE = '/tmp/batch-extract-failed-ids.json';
+
+function loadFailedIds(): Set<string> {
+  try {
+    if (!existsSync(FAILED_FILE)) return new Set();
+    const data = JSON.parse(readFileSync(FAILED_FILE, 'utf-8'));
+    return new Set(data);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFailedIds(ids: Set<string>): void {
+  writeFileSync(FAILED_FILE, JSON.stringify([...ids]));
+}
 
 if (!SUPABASE_SERVICE_KEY) {
   console.error('请设置环境变量: SUPABASE_SERVICE_KEY');
@@ -129,7 +145,7 @@ async function extractConditions(policy: Policy): Promise<{
   status: 'completed' | 'failed';
   error?: string;
 }> {
-  const policyName = policy.policy_name || policy.name || '未知政策';
+  const policyName = policy.name || policy.policy_name || '未知政策';
   const conditionText = policy.policy_condition || policy.policyCondition || '';
 
   if (!conditionText || conditionText.trim() === '') {
@@ -205,12 +221,17 @@ async function loadPolicies(): Promise<Policy[]> {
       .map(row => row.policy_id)
   );
 
-  console.log(`已有 ${alreadyExtracted.size} 条政策完成提取, ${failedIds.size} 条失败`);
+  // 从 JSON 文件加载失败ID（跨session持久化）
+  const jsonFailedIds = loadFailedIds();
+  jsonFailedIds.forEach(id => failedIds.add(id));
+
+  console.log(`已有 ${alreadyExtracted.size} 条政策完成提取, ${failedIds.size} 条失败（含JSON文件）`);
+  saveFailedIds(failedIds);
 
   // 获取所有政策
   const { data: policies, error } = await supabase
     .from('policies')
-    .select('id, policy_name, policy_condition');
+    .select('id, name, policy_condition');
 
   if (error) {
     console.warn(`无法从 policies 表加载: ${error.message}`);
@@ -241,7 +262,7 @@ async function main() {
   let skipped = 0;
 
   for (const policy of policies) {
-    const policyName = policy.policy_name || policy.name || policy.id;
+    const policyName = policy.name || policy.policy_name || policy.id;
     process.stdout.write(`[${completed + failed + skipped + 1}/${policies.length}] ${policyName.substring(0, 30)}... `);
 
     const conditionText = policy.policy_condition || policy.policyCondition || '';
@@ -256,9 +277,17 @@ async function main() {
     if (result.status === 'failed') {
       console.log(`FAILED: ${result.error}`);
       failed++;
+      // 持久化失败ID到JSON文件
+      const currentFailed = loadFailedIds();
+      currentFailed.add(policy.id);
+      saveFailedIds(currentFailed);
     } else {
       console.log('OK');
       completed++;
+      // 从JSON文件移除（成功后清理）
+      const currentFailed = loadFailedIds();
+      currentFailed.delete(policy.id);
+      saveFailedIds(currentFailed);
     }
 
     await saveToSupabase(
