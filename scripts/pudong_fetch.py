@@ -72,6 +72,11 @@ def parse_args():
         default=None,
         help="从已有 JSON 读取记录（用于重试）"
     )
+    parser.add_argument(
+        "--simple",
+        action="store_true",
+        help="简单模式：不带行业标签快速抓取（默认完整模式）"
+    )
     return parser.parse_args()
 
 
@@ -273,7 +278,31 @@ async def main():
     else:
         print("Step 1: 抓取列表...")
         async with (await browser_launch(headless=True)) as browser:
-            if args.apply_status in (1, 2):
+            if not args.simple:
+                # 完整模式：按行业 x 申报状态分别抓取
+                INDUSTRY_IDS = [1, 2, 3, 5, 7, 18, 23, 24, 26, 27]
+                all_industry_items: list[dict] = []
+                for ind_id in INDUSTRY_IDS:
+                    ind_items = []
+                    for as_val in [1, 2]:
+                        items = await fetch_list(browser, apply_status=as_val, industry_value=ind_id)
+                        for item in items:
+                            item["applyStatus"] = as_val
+                            item["industryValueList"] = str(ind_id)
+                        ind_items.extend(items)
+                    print(f"  行业 {ind_id}: {len(ind_items)} 条")
+                    all_industry_items.extend(ind_items)
+                # 按 ID 去重
+                seen_ids_fetch = set()
+                deduped = []
+                for item in all_industry_items:
+                    iid = item.get("id", "")
+                    if iid and iid not in seen_ids_fetch:
+                        seen_ids_fetch.add(iid)
+                        deduped.append(item)
+                new_items = deduped
+                print(f"  去重后: {len(new_items)} 条")
+            elif args.apply_status in (1, 2):
                 items1 = await fetch_list(browser, apply_status=1)
                 for item in items1:
                     item["applyStatus"] = 1
