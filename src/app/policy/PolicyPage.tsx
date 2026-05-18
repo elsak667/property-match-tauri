@@ -202,7 +202,6 @@ export default function PolicyPage() {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [industries, setIndustries] = useState<string[]>([]);
-  const [caps, setCaps] = useState<string[]>([]);
   const [dept, setDept] = useState("");
   const [results, setResults] = useState<PolicyResult[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -256,7 +255,6 @@ export default function PolicyPage() {
       industry: industries[0] || "",
       location,
       dept,
-      caps,
     });
     const sorted = [...filtered].sort((a, b) => {
       const ta = a.zcReleaseTime ? new Date(a.zcReleaseTime).getTime() : 0;
@@ -265,7 +263,7 @@ export default function PolicyPage() {
     });
     setResults(sorted);
     setMatchLoading(false);
-  }, [policies, query, industries, location, dept, caps]);
+  }, [policies, query, industries, location, dept]);
 
   const handleToggleExpand = useCallback((name: string) => {
     trackDetail(name);
@@ -301,7 +299,6 @@ export default function PolicyPage() {
     setQuery("");
     setLocation("");
     setIndustries([]);
-    setCaps([]);
     setDept("");
     setExpanded(new Set());
     setSelected(new Set());
@@ -316,7 +313,7 @@ export default function PolicyPage() {
     showToast("info", "浏览器已打开，请在浏览器中打印保存为 PDF");
   }
 
-  const activeFiltersCount = [industries.length > 0, caps.length > 0, !!location, !!dept, !!query.trim()].filter(Boolean).length;
+  const activeFiltersCount = [industries.length > 0, !!location, !!dept, !!query.trim()].filter(Boolean).length;
   const hasFilters = activeFiltersCount > 0;
   const isLoading = dataLoading || matchLoading;
 
@@ -420,7 +417,7 @@ export default function PolicyPage() {
 
           {options.industries.length > 0 && (
             <div className="filter-section">
-              <div className="filter-label"><Icon.industry /> 产业方向</div>
+              <div className="filter-label"><Icon.industry /> 专项政策</div>
               <div className="tag-grid">
                 {options.industries.map(ind => (
                   <button
@@ -450,23 +447,7 @@ export default function PolicyPage() {
             </div>
           )}
 
-          {options.caps.length > 0 && (
-            <div className="filter-section">
-              <div className="filter-label"><Icon.zap /> 政策能力</div>
-              <div className="tag-grid">
-                {options.caps.map(c => (
-                  <button
-                    key={c.k}
-                    className={`tag-btn${caps.includes(c.k) ? " active" : ""}`}
-                    onClick={() => toggleTag(caps, setCaps, c.k)}
-                  >
-                    {c.l}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
+          
           
           <div className="form-actions">
             <button className="btn-secondary" onClick={resetAll}>重置全部</button>
