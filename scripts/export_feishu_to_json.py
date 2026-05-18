@@ -140,7 +140,7 @@ def export_policies(token, out_dir):
     """导出政策 sheet → policies.json"""
     log("  导出 policies...")
     spreadsheet, sheet_id = SHEETS["policies"]
-    rows = read_sheet(token, spreadsheet, sheet_id, "A1:U600")
+    rows = read_sheet(token, spreadsheet, sheet_id, "A1:Z600")
     if not rows:
         log("    跳过（无数据）")
         return
