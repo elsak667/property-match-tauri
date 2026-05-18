@@ -107,7 +107,7 @@ def get_field(item: dict, excel_field: str):
         "title": item.get("title", ""),
         "r2212SpecialCategoryName": item.get("r2212SpecialCategoryName", ""),
         "r2212IndustryName": item.get("r2212IndustryName", ""),
-        "industryValueList": item.get("industryValueList", ""),
+        "industryValueList": (lambda v: v.strip(",") if v else "")(item.get("r2212IndustryValue", "")),
         "policyObject": clean_text(content.get("support", "")),
         "policyCondition": clean_text(content.get("conditions", "")),
         "policyContent": clean_text(content.get("content", "")),
